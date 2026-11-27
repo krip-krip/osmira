@@ -51,7 +51,9 @@ Vérifications utiles :
 - Pi 4 Model B Rev 1.5, 1 Go, Raspberry Pi OS Trixie sans bureau.
   Nom `panelTest`, utilisateur `alex`.
 - `eth0` (NetworkManager, `netplan-eth0`) : DHCP + secours `192.168.101.50/24`.
-- Affichage : `/dev/dri/card0`, connecteur `HDMI-A-1`, 1080p50.
+- Affichage : `/dev/dri/card0`, écran branché sur `HDMI-A-2` (constaté le
+  2026-11-27 ; la maquette utilisait `HDMI-A-1`), 1080p50. `connector = auto`
+  dans `agent.toml` prend le premier écran branché.
 - CMA : 512 Mo (`dtoverlay=vc4-kms-v3d` par défaut).
 - Port 8080 déjà occupé (probablement `talktome-headless`) → `ptzview` sur **8081**.
 

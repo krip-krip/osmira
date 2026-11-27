@@ -30,7 +30,8 @@ reconnect_ms = 2000
 hwaccel = "drm"
 extra_hw_frames = 2
 drm_device = "auto"
-connector = "HDMI-A-1"
+# "auto": first connected screen (panelTest uses HDMI-A-2).
+connector = "auto"
 hdmi_mode = "1920x1080@50"
 video_plane = "auto"
 font = "DejaVu Sans"
