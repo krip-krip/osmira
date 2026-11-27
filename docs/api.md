@@ -98,12 +98,55 @@ curl -X PUT localhost:8000/api/stations/panelTest/rights/cam1 -H 'Content-Type: 
 - `version` = `sha256:` + empreinte du JSON canonique (clés triées, sans
   espaces) de l'objet **sans** le champ `version`.
 
+### Caméra affichée par sortie (matrice, ADR 0009)
+
+Une **destination** est une sortie vidéo d'un poste (`outputs` sorties par
+poste, 1 par défaut). Le choix est un état, hors configuration versionnée.
+
+- `GET /api/stations/{id}/outputs` → `[{"output": 1, "camera_id": "cam2"}]`
+  (`null` : aucun choix du Core)
+- `PUT /api/stations/{id}/outputs/{output}/selection` avec
+  `{"camera_id": "cam2"}` : le poste doit avoir le droit `view` sur la caméra
+  (sinon `409`) ; sortie inexistante : `404`.
+- `GET /api/matrix` → la matrice complète pour l'interface :
+
+```json
+{
+  "sources": [{"camera_id": "cam1", "label": "CAM 1"}, …],
+  "destinations": [
+    {"station_id": "panelTest", "station_label": "Cadreur 1", "output": 1,
+     "selected": "cam2", "allowed": ["cam1", "cam2", "cam3", "cam4"]}
+  ]
+}
+```
+
+Retirer le droit `view` (ou supprimer la caméra, ou la sortie) efface la
+sélection correspondante.
+
+### Événements d'un poste (SSE)
+
+- `GET /api/stations/{id}/events` — connexion permanente ouverte par le poste
+  (`curl -N` pour la voir). Un commentaire de maintien (`: ping`) passe quand
+  rien ne se passe.
+
+| Événement | Données | Quand |
+|---|---|---|
+| `state` | `{"config_version": "sha256:…", "selections": [{"output": 1, "camera_id": "cam2"}]}` | à chaque connexion, en premier |
+| `select` | `{"output": 1, "camera_id": "cam2"}` (`null` : choix effacé) | la caméra choisie pour une sortie change |
+| `config_changed` | `{"version": "sha256:…"}` | la configuration du poste change : le poste refait `GET /config` |
+
+Seuls les vrais changements sont envoyés (pas d'événement si on re-choisit la
+même caméra ou si une autre station change). Après une coupure, le poste se
+reconnecte et repart de l'événement `state`.
+
+```
+curl -N localhost:8000/api/stations/panelTest/events
+```
+
 ## Prévu (incréments suivants, à préciser le moment venu)
 
-- `GET /api/stations/{id}/events` — flux SSE, connexion permanente ouverte par
-  le poste. Événements : `config_changed` (`{"version": …}`), `tally`
-  (`{"camera_id", "tally"}`), `umd` (`{"camera_id", "text"}`). À la connexion,
-  le Core envoie l'état courant (version, tally et UMD de ses caméras).
+- Événements `tally` (`{"camera_id", "tally"}`) et `umd`
+  (`{"camera_id", "text"}`) sur le même flux ; ajoutés à `state`.
 - `POST /api/stations/{id}/status` — toutes les quelques secondes : version de
   config appliquée, caméra affichée, état des flux, manette ; sert de signal
   de vie (poste « hors ligne » après N secondes sans message).

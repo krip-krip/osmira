@@ -28,6 +28,7 @@ Règles :
 | [0006](0006-pilotes-cameras-et-entrees-modulaires.md) | Pilotes caméras et entrées manettes modulaires | Accepté |
 | [0007](0007-monorepo-github-flow-ci.md) | Monorepo, GitHub flow, CI dès le départ | Accepté |
 | [0008](0008-pile-osmiracore.md) | Pile technique d'OsmiraCore (uv, SQLAlchemy, Jinja2 + htmx, version par empreinte) | Accepté |
+| [0009](0009-bascule-depuis-le-core.md) | Choix de la caméra affichée depuis le Core (matrice) | Accepté |
 
 ## Modèle
 

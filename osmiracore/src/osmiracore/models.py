@@ -40,6 +40,8 @@ class Station(Base):
     label: Mapped[str]
     # Streams the station can decode permanently (ADR 0002).
     max_decoders: Mapped[int]
+    # Video outputs (HDMI) of the station: the destinations of the matrix.
+    outputs: Mapped[int] = mapped_column(default=1)
 
 
 class Right(Base):
@@ -59,3 +61,19 @@ class Right(Base):
     decode: Mapped[bool]
     view: Mapped[bool]
     control: Mapped[bool]
+
+
+class Selection(Base):
+    """Camera shown on a station output, as chosen from the Core (ADR 0009).
+
+    Runtime state, not part of the versioned configuration. No row means
+    the Core has not chosen a camera for this output.
+    """
+
+    __tablename__ = "selections"
+
+    station_id: Mapped[str] = mapped_column(
+        ForeignKey("stations.id", ondelete="CASCADE"), primary_key=True
+    )
+    output: Mapped[int] = mapped_column(primary_key=True)
+    camera_id: Mapped[str] = mapped_column(ForeignKey("cameras.id", ondelete="CASCADE"))

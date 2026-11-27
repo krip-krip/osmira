@@ -70,6 +70,9 @@
   - **État** : tally et UMD par caméra.
 - Calcule pour chaque poste sa configuration (adresses média et contrôle selon
   le site du poste ; respect de la capacité de décodage).
+- Matrice (ADR 0009) : choisit la caméra affichée sur chaque sortie vidéo de
+  chaque poste ; envoyée par SSE, exécutée par le poste. La manette pourra
+  aussi commuter (la dernière commande gagne).
 - Distingue dès le modèle « caméra affichée » et « caméra pilotée » (identiques
   au départ).
 - Prise de main / arbitrage entre opérateurs : géré par le Core ; en cas de
@@ -81,7 +84,7 @@
 1. Au démarrage : `GET /api/stations/<id>/config` → configuration complète avec
    numéro de version ; enregistrée en local.
 2. Connexion permanente `GET /api/stations/<id>/events` (SSE) : événements
-   `config_changed`, `tally`, `umd`…
+   `state` (à la connexion), `select`, `config_changed`, puis `tally`, `umd`…
 3. `POST /api/stations/<id>/status` toutes les quelques secondes (état + signal de vie).
 4. Après une coupure : reconnexion SSE, nouvelle récupération de la config si la
    version a changé.

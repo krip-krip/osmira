@@ -54,6 +54,7 @@ Un poste = un Raspberry Pi OsmiraCam.
 | `id` | texte | `panelTest` | identifiant fixe, connu du Pi |
 | `label` | texte | `Cadreur 1` | |
 | `max_decoders` | entier | `4` | nombre de flux décodables en permanence (ADR 0002) |
+| `outputs` | entier ≥ 1 | `1` | sorties vidéo (HDMI) : les destinations de la matrice |
 
 Plus tard : `site_id`, `gamepad_profile_id`, jeton d'accès, dernier signal
 de vie et état remonté (`POST /status`).
@@ -77,6 +78,19 @@ Règles vérifiées à l'enregistrement :
 
 Plus tard : « caméra affichée » et « caméra pilotée » distinctes, prise de main
 et arbitrage entre postes (qui pilote quoi à l'instant t).
+
+## Selection (caméra affichée par sortie) — ADR 0009
+
+État, pas configuration : ne change pas la version de config.
+
+| Champ | Type | Notes |
+|---|---|---|
+| `station_id`, `output` | texte, entier | clé : une sortie d'un poste (1…`outputs`) |
+| `camera_id` | texte | caméra choisie ; le poste doit avoir le droit `view` |
+
+Pas de ligne = aucun choix du Core (le poste affiche sa première caméra
+visible). Effacée si le droit `view` disparaît, si la caméra est supprimée ou
+si la sortie n'existe plus.
 
 ## Prévu, hors incrément 1
 

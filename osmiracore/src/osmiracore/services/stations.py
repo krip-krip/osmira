@@ -1,16 +1,21 @@
 """Station management and station rights on cameras."""
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from osmiracore.models import Right, Station
+from osmiracore.models import Right, Selection, Station
 from osmiracore.schemas import RightIn, RightOut, StationCreate, StationOut, StationUpdate
 from osmiracore.services.cameras import get_camera
 from osmiracore.services.errors import ConflictError, NotFoundError
 
 
 def to_out(station: Station) -> StationOut:
-    return StationOut(id=station.id, label=station.label, max_decoders=station.max_decoders)
+    return StationOut(
+        id=station.id,
+        label=station.label,
+        max_decoders=station.max_decoders,
+        outputs=station.outputs,
+    )
 
 
 def right_to_out(right: Right) -> RightOut:
@@ -37,7 +42,9 @@ def get_station(session: Session, station_id: str) -> Station:
 def create_station(session: Session, data: StationCreate) -> Station:
     if session.get(Station, data.id) is not None:
         raise ConflictError(f"station '{data.id}' already exists")
-    station = Station(id=data.id, label=data.label, max_decoders=data.max_decoders)
+    station = Station(
+        id=data.id, label=data.label, max_decoders=data.max_decoders, outputs=data.outputs
+    )
     session.add(station)
     session.commit()
     return station
@@ -53,6 +60,11 @@ def update_station(session: Session, station_id: str, data: StationUpdate) -> St
         )
     station.label = data.label
     station.max_decoders = data.max_decoders
+    station.outputs = data.outputs
+    # Outputs that no longer exist lose their selection.
+    session.execute(
+        delete(Selection).where(Selection.station_id == station_id, Selection.output > data.outputs)
+    )
     session.commit()
     return station
 
@@ -101,6 +113,8 @@ def set_right(session: Session, station_id: str, camera_id: str, data: RightIn) 
     right.decode = data.decode
     right.view = data.view
     right.control = data.control
+    if not data.view:
+        _clear_selections(session, station_id, camera_id)
     session.commit()
     return right
 
@@ -110,7 +124,17 @@ def delete_right(session: Session, station_id: str, camera_id: str) -> None:
     if right is None:
         raise NotFoundError(f"station '{station_id}' has no right on camera '{camera_id}'")
     session.delete(right)
+    _clear_selections(session, station_id, camera_id)
     session.commit()
+
+
+def _clear_selections(session: Session, station_id: str, camera_id: str) -> None:
+    """A camera the station may no longer view leaves the station's outputs."""
+    session.execute(
+        delete(Selection).where(
+            Selection.station_id == station_id, Selection.camera_id == camera_id
+        )
+    )
 
 
 def _count_decode(session: Session, station_id: str, excluding_camera: str | None = None) -> int:
