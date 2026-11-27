@@ -146,3 +146,27 @@ td.hardware { white-space: normal; min-width: 14rem; }
 button:disabled { opacity: 0.45; cursor: default; }
 .badge { display: inline-block; font-size: 0.75rem; padding: 0 0.4rem; border: 1px solid currentColor; border-radius: 999px; margin-left: 0.3rem; }
 fieldset > .wide { grid-column: 1 / -1; }
+
+/* --- links --------------------------------------------------------------------- */
+.period { display: flex; flex-wrap: wrap; gap: 0.8rem; align-items: center; margin: 0 0 1rem; }
+.segmented { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg { flex-direction: row; align-items: center; padding: 0.35rem 0.75rem; cursor: pointer; font-size: 0.85rem; border-right: 1px solid var(--line); }
+.seg:last-child { border-right: 0; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg:has(input:checked) { background: var(--accent); color: var(--accent-text); }
+.custom-dates { display: inline-flex; gap: 0.4rem; align-items: center; color: var(--muted); }
+table.links td { vertical-align: top; }
+table.links tr.group th { text-align: left; padding-top: 1rem; font-size: 0.95rem; color: var(--text); border-bottom: 1px solid var(--line); }
+table.links tr.ended td { opacity: 0.7; }
+td.warn { color: #e0a020; }
+td.bad, .card.bad strong { color: var(--error); font-weight: 700; }
+.small { font-size: 0.8rem; }
+.cards { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 0 0 1.2rem; }
+.card { display: flex; flex-direction: column; gap: 0.15rem; min-width: 9rem; padding: 0.6rem 0.8rem;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+.card span, .card small { color: var(--muted); font-size: 0.8rem; }
+.card strong { font-size: 1.25rem; }
+.card.warn strong { color: #e0a020; }
+.chart { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 0.5rem 0.8rem 0.6rem; margin: 0 0 0.8rem; }
+.chart h2 { font-size: 0.9rem; color: var(--muted); font-weight: 600; margin: 0 0 0.3rem; }
+.u-legend { color: var(--text); font-size: 0.8rem; }

@@ -23,6 +23,7 @@ from osmiracore.services.events import EventBus
 from osmiracore.services.srt import SrtCollector
 from osmiracore.settings import Settings, load_settings
 from osmiracore.web import admin, media
+from osmiracore.web import links as links_web
 from osmiracore.web import routes as web
 
 
@@ -84,6 +85,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(web.router)
     app.include_router(admin.router)
     app.include_router(media.router)
+    app.include_router(links_web.router)
     app.mount("/static", StaticFiles(directory=web.STATIC_DIR), name="static")
     return app
 

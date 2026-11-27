@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Links{% endblock %}
+{% block content %}
+<div class="title-row">
+  <h1>Links</h1>
+</div>
+<p class="hint">
+  Every SRT link seen in the period, active or ended, one row per pair of ends:
+  <strong>camera → media server</strong> (MediaMTX, receiver side),
+  <strong>media server → station</strong> (MediaMTX sender side, and what the station reports),
+  <strong>camera → station</strong> direct (what the station reports). Click a link for its curves.
+</p>
+{% include "_period.html" %}
+{% include "_links_table.html" %}
+{% endblock %}

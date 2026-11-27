@@ -1,0 +1,61 @@
+{%- macro cam(id) -%}{{ names.camera.get(id, id) if id else "unknown camera" }}{%- endmacro -%}
+{%- macro srv(id) -%}{{ names.server.get(id, id) }}{%- endmacro -%}
+{%- macro stn(id) -%}{% if id and id.startswith("?") %}unknown reader {{ id[1:] }}{% else %}{{ id }}{% endif %}{%- endmacro -%}
+{#- Reloaded every 10 s when the period runs up to now. -#}
+<div id="links" {% if live %}hx-get="/links/table?{{ period.query }}" hx-trigger="every 10s" hx-swap="outerHTML"{% endif %}>
+{% if not groups %}
+  <p class="empty">No link in this period. Links appear when a media server is polled or a station reports.</p>
+{% else %}
+<div class="scroll">
+  <table class="list links">
+    <thead>
+      <tr>
+        <th>Link</th><th>State</th><th>Duration</th>
+        <th title="SRT connections in the period">Conn.</th>
+        <th>Loss</th><th>Retrans.</th><th title="Packets too late to be played">Dropped</th>
+        <th>RTT avg / max</th><th>Mb/s</th>
+        <th title="Frames per second at the station">Fps avg / min</th>
+        <th>No picture</th><th>Decode err.</th><th>Reconn.</th>
+      </tr>
+    </thead>
+    {% for camera_id, items in groups %}
+    <tbody>
+      <tr class="group"><th colspan="13">{{ cam(camera_id) }}{% if camera_id %} <span class="muted">{{ camera_id }}</span>{% endif %}</th></tr>
+      {% for x in items %}
+      <tr class="{{ 'ended' if not x.active }}">
+        <td>
+          <a href="/links/detail?id={{ x.id|urlencode }}&amp;{{ period.query }}">
+          {% if x.kind == "camera_server" %}{{ cam(x.camera_id) }} → {{ srv(x.server_id) }}
+          {% elif x.kind == "server_station" %}{{ srv(x.server_id) }} → {{ stn(x.station_id) }}
+          {% else %}{{ cam(x.camera_id) }} → {{ stn(x.station_id) }}{% endif %}</a>
+          {% if x.kind == "camera_station" %}<span class="badge">direct</span>{% endif %}
+          {% if x.path %}<span class="sub mono">{{ x.server_id }}/{{ x.path }}</span>{% endif %}
+        </td>
+        <td>
+          {% if x.active %}<span class="dot online" aria-hidden="true"></span> active
+          {% else %}<span class="dot offline" aria-hidden="true"></span> ended{% endif %}
+          <span class="sub" title="{{ x.first_seen }} → {{ x.last_seen }}">{{ x.last_seen[11:19] }} UTC</span>
+        </td>
+        <td>{{ x.duration_s|duration }}</td>
+        <td>{{ x.connections|num }}</td>
+        <td class="{{ 'warn' if x.loss_percent and x.loss_percent > 1 }}">
+          {% if x.loss_percent is not none %}{{ x.loss_percent|num(2) }} %{% else %}–{% endif %}
+          {% if x.packets_lost %}<span class="sub">{{ x.packets_lost|num }} pkts</span>{% endif %}
+        </td>
+        <td>{{ x.packets_retrans|num }}</td>
+        <td class="{{ 'bad' if x.packets_dropped }}">{{ x.packets_dropped|num }}</td>
+        <td>{{ x.rtt_avg_ms|num }} / {{ x.rtt_max_ms|num }}</td>
+        <td>{{ x.mbps_avg|num }}</td>
+        <td class="{{ 'warn' if x.fps_min is not none and x.fps_min < 45 }}">{{ x.fps_avg|num }} / {{ x.fps_min|num }}</td>
+        <td class="{{ 'bad' if x.no_picture_s }}">{{ x.no_picture_s|duration if x.no_picture_s is not none else "–" }}</td>
+        <td class="{{ 'warn' if x.decode_errors }}">{{ x.decode_errors|num }}</td>
+        <td class="{{ 'warn' if x.reconnects }}">{{ x.reconnects|num }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    {% endfor %}
+  </table>
+</div>
+<p class="muted small">{{ count }} link{{ "s" if count != 1 }}{% if live %} · refreshed every 10 s{% endif %}.</p>
+{% endif %}
+</div>
