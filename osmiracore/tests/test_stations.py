@@ -39,7 +39,7 @@ def test_station_crud(client):
 
 def test_station_invalid_data(client):
     assert client.post("/api/stations", json={**STATION, "id": "panel test"}).status_code == 422
-    assert client.post("/api/stations", json={**STATION, "max_decoders": 99}).status_code == 422
+    assert client.post("/api/stations", json={**STATION, "max_decoders": -1}).status_code == 422
 
 
 # --- rights -----------------------------------------------------------------

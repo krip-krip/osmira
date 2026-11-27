@@ -78,16 +78,23 @@ curl -X PUT localhost:8000/api/stations/panelTest/rights/cam1 -H 'Content-Type: 
       "id": "cam1", "label": "CAM 1", "position": 1,
       "rights": {"decode": true, "view": true, "control": true},
       "media":   {"srt_url": "srt://192.168.104.253:8890?mode=caller&streamid=read:cam1",
-                  "latency_ms": 20, "codec": "hevc", "width": 1920, "height": 1080, "fps": 50},
-      "control": {"driver": "panasonic_aw", "host": "192.168.105.51", "port": 80,
-                  "username": "admin", "password": "…", "options": {}}
+                  "latency_ms": 20, "codec": "hevc", "width": 1920, "height": 1080, "fps": 50}
     }
   ]
 }
 ```
 
 - Seules les caméras avec `decode` apparaissent, triées par `position`.
-- `control` vaut `null` si le poste n'a pas le droit `control`.
+  Aucune limite globale du nombre de caméras : seule la capacité
+  `max_decoders` de chaque poste compte.
+- **Pilotage pas encore envoyé** : la visualisation passe d'abord. Le bloc
+  `control` de la caméra (pilote, adresse, identifiants) sera ajouté à chaque
+  caméra quand l'agent aura ses pilotes, et seulement pour les postes qui ont
+  le droit `control`. Le droit `control` est déjà stocké et renvoyé dans
+  `rights`.
+- Changer les droits d'un poste (ajouter, retirer, réordonner des caméras)
+  change sa `version` : le poste recharge sa config (signal `config_changed`
+  par SSE, incrément suivant).
 - `version` = `sha256:` + empreinte du JSON canonique (clés triées, sans
   espaces) de l'objet **sans** le champ `version`.
 

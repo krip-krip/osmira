@@ -59,7 +59,8 @@ class CameraOut(StrictModel):
 
 class StationUpdate(StrictModel):
     label: Annotated[str, Field(min_length=1, max_length=64)]
-    max_decoders: Annotated[int, Field(ge=0, le=16)] = 4
+    # Hardware capacity of this station, no global limit (4 for a Pi 4 in 1080p50).
+    max_decoders: Annotated[int, Field(ge=0)] = 4
 
 
 class StationCreate(StationUpdate):
@@ -71,7 +72,7 @@ class StationOut(StationUpdate):
 
 
 class RightIn(StrictModel):
-    position: Annotated[int, Field(ge=1, le=99)]
+    position: Annotated[int, Field(ge=1)]
     decode: bool = False
     view: bool = False
     control: bool = False
@@ -89,3 +90,28 @@ class RightIn(StrictModel):
 
 class RightOut(RightIn):
     camera_id: str
+
+
+class RightLevels(StrictModel):
+    decode: bool
+    view: bool
+    control: bool
+
+
+class ConfigCamera(StrictModel):
+    id: str
+    label: str
+    position: int
+    rights: RightLevels
+    media: Media
+    # Camera control (PTZ) is planned but not sent yet: the "control" block
+    # will be added here when the agent gets its camera drivers.
+
+
+class StationConfig(StrictModel):
+    """Everything a station needs to run on its own. See docs/api.md."""
+
+    station: StationOut
+    # "sha256:<hex>" fingerprint of the rest of the document.
+    version: str
+    cameras: list[ConfigCamera]

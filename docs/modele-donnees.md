@@ -95,5 +95,10 @@ Right et Camera ; elle n'est pas stockée. Sa **version** est l'empreinte
 SHA-256 de son contenu (JSON canonique) : elle change dès qu'une donnée qui
 la concerne change, et seulement dans ce cas. Exemple : `docs/api.md`.
 
-Le bloc `control` d'une caméra (avec ses identifiants) n'est envoyé qu'aux
-postes qui ont le droit `control` sur elle.
+Pour l'instant la configuration ne contient que le bloc **média** (priorité à
+la visualisation). Le bloc `control` d'une caméra (avec ses identifiants) y
+sera ajouté avec le pilotage PTZ, et seulement pour les postes qui ont le
+droit `control` sur elle.
+
+Pas de limite globale du nombre de caméras : seule la capacité
+`max_decoders` de chaque poste limite les flux qu'il reçoit.
