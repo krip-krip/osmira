@@ -11,16 +11,30 @@
 <div class="scroll">
   <table class="list">
     <thead>
-      <tr><th>Id</th><th>Label</th><th>SRT URL</th><th>Format</th><th>Control</th><th></th></tr>
+      <tr><th>Id</th><th>Label</th><th>SRT URL</th><th>Declared</th><th>Received</th><th>Control</th><th></th></tr>
     </thead>
     <tbody>
-      {% for c in cameras %}
+      {% for c in cameras %}{% set m = c.media %}{% set r = c.received %}
       <tr>
         <td><a href="/cameras/{{ c.id }}">{{ c.id }}</a></td>
         <td>{{ c.label }}</td>
-        <td class="mono">{{ c.media_srt_url }}</td>
-        <td>{{ c.media_codec|upper }} {{ c.media_height }}p{{ c.media_fps }} · {{ c.media_latency_ms }} ms</td>
-        <td>{% if c.control_driver == "none" %}<span class="muted">none</span>{% else %}{{ c.control_driver }} {{ c.control_host or "" }}{% endif %}</td>
+        <td class="mono">{{ m.srt_url }}</td>
+        <td>
+          {% if m.codec or m.width or m.fps %}
+            {{ (m.codec or "")|upper }}
+            {% if m.width and m.height %}{{ m.width }}x{{ m.height }}{% endif %}
+            {% if m.fps %}{{ m.fps }} fps{% endif %}
+          {% else %}<span class="muted">auto</span>{% endif %}
+          <span class="sub">SRT {{ m.latency_ms }} ms</span>
+        </td>
+        <td>
+          {% if r %}
+            {% if r.width and r.height %}{{ r.width }}x{{ r.height }} · {% endif %}{{ "%.1f"|format(r.fps) }} fps
+            <span class="sub">via {{ r.station_id }}</span>
+          {% else %}<span class="muted">–</span>{% endif %}
+          {% for w in c.warnings %}<span class="warn sub">⚠ {{ w }}</span>{% endfor %}
+        </td>
+        <td>{% if c.control.driver == "none" %}<span class="muted">none</span>{% else %}{{ c.control.driver }} {{ c.control.host or "" }}{% endif %}</td>
         <td class="actions"><a href="/cameras/{{ c.id }}">Edit</a></td>
       </tr>
       {% endfor %}

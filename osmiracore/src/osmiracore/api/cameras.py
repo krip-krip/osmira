@@ -2,16 +2,20 @@
 
 from fastapi import APIRouter, status
 
-from osmiracore.api.deps import BusDep, SessionDep
+from osmiracore.api.deps import BusDep, SessionDep, SettingsDep
 from osmiracore.schemas import CameraCreate, CameraOut, CameraUpdate
 from osmiracore.services import cameras
+from osmiracore.services import status as heartbeat
 
 router = APIRouter(prefix="/api/cameras", tags=["cameras"])
 
 
 @router.get("")
-def list_cameras(session: SessionDep) -> list[CameraOut]:
-    return [cameras.to_out(c) for c in cameras.list_cameras(session)]
+def list_cameras(session: SessionDep, settings: SettingsDep) -> list[CameraOut]:
+    """`received`: format an online station currently receives; `warnings`:
+    declared values that differ from it."""
+    received = heartbeat.received_media(session, settings.online_timeout_s)
+    return [cameras.to_out(c, received.get(c.id)) for c in cameras.list_cameras(session)]
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -22,8 +26,9 @@ def create_camera(data: CameraCreate, session: SessionDep, bus: BusDep) -> Camer
 
 
 @router.get("/{camera_id}")
-def get_camera(camera_id: str, session: SessionDep) -> CameraOut:
-    return cameras.to_out(cameras.get_camera(session, camera_id))
+def get_camera(camera_id: str, session: SessionDep, settings: SettingsDep) -> CameraOut:
+    received = heartbeat.received_media(session, settings.online_timeout_s)
+    return cameras.to_out(cameras.get_camera(session, camera_id), received.get(camera_id))
 
 
 @router.put("/{camera_id}")

@@ -129,3 +129,5 @@ button:hover, .button:hover { border-color: var(--accent); }
 .warn { color: #e0a020; }
 table.stations td { vertical-align: top; }
 td.hardware { white-space: normal; min-width: 14rem; }
+.note { color: var(--muted); font-size: 0.85rem; margin: 0; grid-column: 1 / -1; }
+.warn.sub { color: #e0a020; }

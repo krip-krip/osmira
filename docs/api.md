@@ -34,6 +34,12 @@ Les erreurs renvoient `{"detail": "<message lisible>"}`.
 - `PUT /api/cameras/{id}` → remplacement complet
 - `DELETE /api/cameras/{id}` → supprime aussi ses droits (`204`)
 
+Dans `media`, seuls `srt_url` et `latency_ms` (20 par défaut) comptent pour les
+postes ; `codec`, `width`, `height`, `fps` sont facultatifs (`null` = auto).
+La lecture ajoute `received` (format réellement reçu par un poste en ligne :
+`station_id`, `width`, `height`, `fps`, `seconds_since`, ou `null`) et
+`warnings` (valeurs déclarées différentes du flux reçu).
+
 `control.password` est accepté en écriture mais jamais renvoyé : la lecture
 donne `"password_set": true|false`. En `PUT`, un `password` absent conserve
 l'ancien ; `""` l'efface.

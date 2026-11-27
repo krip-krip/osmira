@@ -35,10 +35,11 @@ class CameraForm(BaseModel):
     label: str = ""
     srt_url: str = ""
     latency_ms: str = "20"
-    codec: str = "hevc"
-    width: str = "1920"
-    height: str = "1080"
-    fps: str = "50"
+    # Empty = auto: nothing declared.
+    codec: str = ""
+    width: str = ""
+    height: str = ""
+    fps: str = ""
     driver: str = "none"
     host: str = ""
     port: str = ""
@@ -54,10 +55,10 @@ class CameraForm(BaseModel):
             label=camera.label,
             srt_url=camera.media_srt_url,
             latency_ms=str(camera.media_latency_ms),
-            codec=camera.media_codec,
-            width=str(camera.media_width),
-            height=str(camera.media_height),
-            fps=str(camera.media_fps),
+            codec=camera.media_codec or "",
+            width=_text(camera.media_width),
+            height=_text(camera.media_height),
+            fps=_text(camera.media_fps),
             driver=camera.control_driver,
             host=camera.control_host or "",
             port="" if camera.control_port is None else str(camera.control_port),
@@ -87,10 +88,10 @@ class CameraForm(BaseModel):
             "media": {
                 "srt_url": self.srt_url.strip(),
                 "latency_ms": self.latency_ms,
-                "codec": self.codec,
-                "width": self.width,
-                "height": self.height,
-                "fps": self.fps,
+                "codec": self.codec or None,
+                "width": self.width.strip() or None,
+                "height": self.height.strip() or None,
+                "fps": self.fps.strip() or None,
             },
             "control": {
                 "driver": self.driver.strip() or "none",
@@ -157,6 +158,10 @@ class RightForm(BaseModel):
                 "control": self.control,
             },
         )
+
+
+def _text(value: int | None) -> str:
+    return "" if value is None else str(value)
 
 
 def _validate(model: type[M], data: dict[str, Any]) -> M:

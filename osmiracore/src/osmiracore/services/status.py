@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from osmiracore.models import Station, StationStatus
-from osmiracore.schemas import StationStatusIn, StationStatusOut
+from osmiracore.schemas import ReceivedMedia, StationStatusIn, StationStatusOut
 from osmiracore.services import config, stations
 
 
@@ -55,3 +55,29 @@ def online_station_ids(session: Session, timeout_s: float, now: float | None = N
     now = time.time() if now is None else now
     rows = session.execute(select(StationStatus.station_id, StationStatus.received_at)).all()
     return {station_id for station_id, at in rows if now - at <= timeout_s}
+
+
+def received_media(
+    session: Session, timeout_s: float, now: float | None = None
+) -> dict[str, ReceivedMedia]:
+    """Per camera, the format an online station currently receives (freshest report)."""
+    now = time.time() if now is None else now
+    found: dict[str, ReceivedMedia] = {}
+    for row in session.scalars(select(StationStatus)):
+        since = now - row.received_at
+        if since > timeout_s:
+            continue
+        data = StationStatusIn.model_validate(row.payload)
+        for cam in data.player.cameras:
+            if not cam.fps:  # no picture right now
+                continue
+            previous = found.get(cam.camera_id)
+            if previous is None or since < previous.seconds_since:
+                found[cam.camera_id] = ReceivedMedia(
+                    station_id=row.station_id,
+                    width=cam.width or None,
+                    height=cam.height or None,
+                    fps=cam.fps,
+                    seconds_since=round(max(0.0, since), 1),
+                )
+    return found

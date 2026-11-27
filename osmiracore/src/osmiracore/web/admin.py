@@ -32,11 +32,11 @@ def _done(url: str) -> RedirectResponse:
 
 
 @router.get("/cameras")
-def camera_list(request: Request, session: SessionDep) -> HTMLResponse:
+def camera_list(request: Request, session: SessionDep, settings: SettingsDep) -> HTMLResponse:
+    received = heartbeat.received_media(session, settings.online_timeout_s)
+    views = [cameras.to_out(c, received.get(c.id)) for c in cameras.list_cameras(session)]
     return TEMPLATES.TemplateResponse(
-        request,
-        "cameras.html",
-        {"active": "cameras", "cameras": cameras.list_cameras(session)},
+        request, "cameras.html", {"active": "cameras", "cameras": views}
     )
 
 
