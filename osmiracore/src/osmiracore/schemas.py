@@ -35,6 +35,17 @@ class ReceivedMedia(StrictModel):
     seconds_since: float
 
 
+class SourceMedia(StrictModel):
+    """The camera's stream as the media server sees it."""
+
+    server_id: str
+    path: str
+    ready: bool
+    codec: str | None  # hevc, h264...
+    width: int | None
+    height: int | None
+
+
 class ControlBase(StrictModel):
     # Name of the agent-side driver; "none" means the camera cannot be driven.
     driver: Annotated[str, Field(pattern=r"^[a-z0-9_]{1,32}$")] = "none"
@@ -70,6 +81,8 @@ class CameraOut(StrictModel):
     control: ControlOut
     # What online stations actually receive (None: no station streams it now).
     received: ReceivedMedia | None = None
+    # The stream as the media server sees it (None: no media server knows it).
+    source: SourceMedia | None = None
     # Declared values that differ from what is received.
     warnings: list[str] = Field(default_factory=list)
 
@@ -218,3 +231,63 @@ class StationConfig(StrictModel):
     # "sha256:<hex>" fingerprint of the rest of the document.
     version: str
     cameras: list[ConfigCamera]
+
+
+class MediaServerUpdate(StrictModel):
+    label: Annotated[str, Field(min_length=1, max_length=64)]
+    api_url: Annotated[str, Field(pattern=r"^https?://", max_length=300)]
+    api_username: Annotated[str, Field(max_length=100)] | None = None
+    # Write-only. On update: absent or null keeps it, "" clears it.
+    api_password: Annotated[str, Field(max_length=200)] | None = None
+    enabled: bool = True
+
+
+class MediaServerCreate(MediaServerUpdate):
+    id: Identifier
+
+
+class MediaServerState(StrictModel):
+    """What the collector last saw of this server."""
+
+    reachable: bool | None  # None: not polled yet
+    last_ok: str | None
+    last_error: str | None
+    version: str | None
+    paths: int
+
+
+class MediaServerOut(StrictModel):
+    id: str
+    label: str
+    api_url: str
+    api_username: str | None
+    password_set: bool
+    enabled: bool
+    state: MediaServerState
+
+
+class SrtLink(StrictModel):
+    """Latest state of one SRT link, with rates over the last interval."""
+
+    link: Literal["camera", "station"]
+    server_id: str
+    path: str
+    camera_id: str | None
+    station_id: str | None
+    remote_addr: str | None
+    seen: str  # ISO 8601 UTC
+    seconds_since: float
+    rtt_ms: float | None
+    mbps: float | None
+    link_capacity_mbps: float | None
+    buffer_ms: float | None
+    # Over the last interval (None for the first sample of a connection).
+    interval_s: float | None
+    loss_percent: float | None
+    retrans_per_s: float | None
+    dropped: int | None
+    # Since the connection started.
+    packets: int | None
+    packets_lost: int | None
+    packets_retrans: int | None
+    packets_dropped: int | None

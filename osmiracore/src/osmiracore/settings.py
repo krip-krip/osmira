@@ -12,10 +12,17 @@ class Settings:
     # A station is offline when its last status is older than this (it sends
     # one every 5 s by default).
     online_timeout_s: float = 15.0
+    # SRT statistics read from the media servers (ADR 0010).
+    srt_collector: bool = True
+    srt_interval_s: float = 5.0
+    srt_retention_days: float = 7.0
 
 
 def load_settings() -> Settings:
     return Settings(
         db_path=Path(os.environ.get("OSMIRACORE_DB_PATH", "osmiracore.db")),
         online_timeout_s=float(os.environ.get("OSMIRACORE_ONLINE_TIMEOUT_S", "15")),
+        srt_collector=os.environ.get("OSMIRACORE_SRT_COLLECTOR", "1") != "0",
+        srt_interval_s=float(os.environ.get("OSMIRACORE_SRT_INTERVAL_S", "5")),
+        srt_retention_days=float(os.environ.get("OSMIRACORE_SRT_RETENTION_DAYS", "7")),
     )

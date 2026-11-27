@@ -6,7 +6,7 @@ from fastapi import APIRouter, Form, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
-from osmiracore.api.deps import BusDep, SessionDep, SettingsDep
+from osmiracore.api.deps import BusDep, CollectorDep, SessionDep, SettingsDep
 from osmiracore.models import Right
 from osmiracore.services import cameras, stations
 from osmiracore.services import status as heartbeat
@@ -32,9 +32,14 @@ def _done(url: str) -> RedirectResponse:
 
 
 @router.get("/cameras")
-def camera_list(request: Request, session: SessionDep, settings: SettingsDep) -> HTMLResponse:
+def camera_list(
+    request: Request, session: SessionDep, settings: SettingsDep, collector: CollectorDep
+) -> HTMLResponse:
     received = heartbeat.received_media(session, settings.online_timeout_s)
-    views = [cameras.to_out(c, received.get(c.id)) for c in cameras.list_cameras(session)]
+    views = [
+        cameras.to_out(c, received.get(c.id), collector.source_of(c))
+        for c in cameras.list_cameras(session)
+    ]
     return TEMPLATES.TemplateResponse(
         request, "cameras.html", {"active": "cameras", "cameras": views}
     )

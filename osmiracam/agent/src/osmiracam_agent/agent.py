@@ -106,7 +106,10 @@ class Agent:
                 ptz.slots,
                 ptz.slots,
             )
-        _write_atomic(ptz.conf_path, ptzview_conf.render(config, ptz, self.selected))
+        text = ptzview_conf.render(
+            config, ptz, self.selected, tag_station=self._settings.tag_srt_streamid
+        )
+        _write_atomic(ptz.conf_path, text)
         self.config = config
         if self._supervisor.running:
             await self._supervisor.restart()
