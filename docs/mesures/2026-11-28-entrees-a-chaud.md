@@ -18,3 +18,11 @@ Aucune erreur `no sockets to check` ; placement des caméras inchangé
 
 Avant (27/11) : chaque changement relançait `ptzview` (coupure de l'image),
 et une entrée retirée faisait clignoter NO SIGNAL sur toutes les entrées.
+
+## Latence par entrée (même jour, PR suivante)
+
+Entrée 3 = cam5 (chemin absent de MediaMTX : connexions refermées en boucle),
+cam2 à l'écran. Latence de cam5 passée de 20 à 40 ms puis revenue à 20 ms
+dans le Core : seule l'entrée 3 se reconnecte (`latence changée (40 ms)`),
+**0 relance de ptzview, 0 coupure** des entrées 1, 2 et 4, aucune erreur
+`no sockets to check` malgré l'entrée 3 qui échoue en boucle.

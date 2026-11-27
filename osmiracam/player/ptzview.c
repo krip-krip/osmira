@@ -649,7 +649,7 @@ static void *cam_thread(void *arg)
         avcodec_free_context(&dec);
         avformat_close_input(&fmt);
         if (c->reload)
-            logm("cam%d : nouvelle URL, reconnexion", c->idx + 1);
+            logm("cam%d : nouveaux réglages, reconnexion", c->idx + 1);
         else if (!g.quit)
             logm("cam%d : déconnecté, nouvel essai dans %d ms", c->idx + 1, g.cfg.reconnect_ms);
     }
