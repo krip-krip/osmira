@@ -27,6 +27,7 @@ Règles :
 | [0005](0005-api-rest-sse.md) | Communication Core ↔ postes : REST + SSE (pas MQTT) | Accepté |
 | [0006](0006-pilotes-cameras-et-entrees-modulaires.md) | Pilotes caméras et entrées manettes modulaires | Accepté |
 | [0007](0007-monorepo-github-flow-ci.md) | Monorepo, GitHub flow, CI dès le départ | Accepté |
+| [0008](0008-pile-osmiracore.md) | Pile technique d'OsmiraCore (uv, SQLAlchemy, Jinja2 + htmx, version par empreinte) | Accepté |
 
 ## Modèle
 

@@ -13,8 +13,10 @@ Architecture : @docs/architecture.md
 
 ## Langue et façon de travailler
 
-- Réponds en français. Code, noms de variables et messages de commit en anglais ;
-  commentaires et documentation en français.
+- Réponds en français. **Tout le code en anglais** : identifiants, routes
+  d'API, champs JSON, commentaires, messages de commit (un poste OsmiraCam =
+  `station`). Seule la documentation (`docs/`, README) reste en français
+  pour l'instant.
 - L'utilisateur est technicien broadcast, à l'aise en Linux et ligne de commande,
   débutant en git et peu à l'aise en C. Explique les commandes git avant de les
   lancer, en une ligne.
