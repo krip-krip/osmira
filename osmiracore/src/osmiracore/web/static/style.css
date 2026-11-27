@@ -48,9 +48,11 @@ h1 { margin: 0.2rem 0 0.4rem; font-size: 1.3rem; }
 table.matrix { border-collapse: separate; border-spacing: 4px; }
 table.matrix th { font-weight: 600; white-space: nowrap; }
 th.corner { color: var(--muted); font-weight: 400; text-align: left; font-size: 0.85rem; }
-th.source { padding: 0 0.3rem; min-width: 5.5rem; }
-th.dest { text-align: left; padding-right: 0.8rem; }
-.output { color: var(--muted); font-weight: 400; font-size: 0.85rem; }
+th.source { text-align: left; padding-right: 0.8rem; }
+th.dest { padding: 0 0.3rem 0.3rem; min-width: 5.5rem; vertical-align: bottom; line-height: 1.25; }
+th.dest span { display: block; }
+.station-id { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 0.9rem; }
+.output, .camera-id, .station-label { color: var(--muted); font-weight: 400; font-size: 0.8rem; }
 
 .cell {
   display: block; width: 100%; min-width: 5.5rem; min-height: 2.6rem;

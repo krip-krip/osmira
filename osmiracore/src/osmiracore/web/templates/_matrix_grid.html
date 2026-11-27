@@ -1,4 +1,5 @@
-{#- Reloaded every 2 s so that switches made elsewhere (API, gamepad) show up. -#}
+{#- Reloaded every 2 s so that switches made elsewhere (API, gamepad) show up.
+    Sources (cameras) are rows, destinations (station outputs) are columns. -#}
 <div id="grid" hx-get="/matrix/grid" hx-trigger="every 2s" hx-swap="outerHTML">
   {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
   {% if not matrix.sources or not matrix.destinations %}
@@ -11,19 +12,23 @@
     <table class="matrix">
       <thead>
         <tr>
-          <th class="corner">Destination \ Source</th>
-          {% for source in matrix.sources %}
-            <th class="source" title="{{ source.camera_id }}">{{ source.label }}</th>
+          <th class="corner">Source \ Destination</th>
+          {% for dest in matrix.destinations %}
+            <th class="dest" title="{{ dest.station_label }}">
+              <span class="station-id">{{ dest.station_id }}</span>
+              <span class="output">out {{ dest.output }}</span>
+              <span class="station-label">{{ dest.station_label }}</span>
+            </th>
           {% endfor %}
         </tr>
       </thead>
       <tbody>
-        {% for dest in matrix.destinations %}
+        {% for source in matrix.sources %}
         <tr>
-          <th class="dest" title="{{ dest.station_id }}">
-            {{ dest.station_label }} <span class="output">out {{ dest.output }}</span>
+          <th class="source" scope="row">
+            {{ source.label }} <span class="camera-id">{{ source.camera_id }}</span>
           </th>
-          {% for source in matrix.sources %}
+          {% for dest in matrix.destinations %}
             {% set selected = dest.selected == source.camera_id %}
             <td>
               {% if source.camera_id in dest.allowed %}
@@ -31,7 +36,7 @@
                         hx-post="/matrix/select" hx-target="#grid" hx-swap="outerHTML"
                         hx-vals='{"station_id": "{{ dest.station_id }}", "output": "{{ dest.output }}", "camera_id": "{{ source.camera_id }}"}'
                         aria-pressed="{{ 'true' if selected else 'false' }}"
-                        title="{{ source.label }} → {{ dest.station_label }} out {{ dest.output }}">
+                        title="{{ source.label }} → {{ dest.station_id }} out {{ dest.output }}">
                   {{ source.label }}
                 </button>
               {% else %}
