@@ -19,7 +19,24 @@ def slot_cameras(config: StationConfig, slots: int) -> list[Camera | None]:
     return cameras + [None] * (slots - len(cameras))
 
 
-def render(config: StationConfig, settings: PtzviewSettings) -> str:
+def display_slot(config: StationConfig, slots: int, camera_id: str | None) -> int:
+    """ptzview input to show for the camera chosen by the Core.
+
+    Falls back to the first camera the operator may view (ADR 0009: no choice
+    from the Core, or a camera that is not, or no longer, viewable here).
+    """
+    cameras = slot_cameras(config, slots)
+    for index, camera in enumerate(cameras, start=1):
+        if camera is not None and camera.view and camera.id == camera_id:
+            return index
+    for index, camera in enumerate(cameras, start=1):
+        if camera is not None and camera.view:
+            return index
+    return 1
+
+
+def render(config: StationConfig, settings: PtzviewSettings, selected: str | None = None) -> str:
+    """ptzview.conf text; ptzview starts on the `selected` camera if possible."""
     cameras = slot_cameras(config, settings.slots)
     used = [c for c in cameras if c is not None]
     # ptzview has one SRT latency for all inputs: take the largest requested.
@@ -33,7 +50,7 @@ def render(config: StationConfig, settings: PtzviewSettings) -> str:
         "[general]",
         f"srt_latency_ms = {latency}",
         f"http_port = {settings.http_port}",
-        f"start_camera = {_start_slot(cameras)}",
+        f"start_camera = {display_slot(config, settings.slots, selected)}",
     ]
     lines += [f"{key} = {_one_line(value)}" for key, value in sorted(settings.general.items())]
 
@@ -45,14 +62,6 @@ def render(config: StationConfig, settings: PtzviewSettings) -> str:
             lines += [f"url = {_one_line(camera.srt_url)}", f"label = {_one_line(camera.label)}"]
             lines += ["tally = off"]
     return "\n".join(lines) + "\n"
-
-
-def _start_slot(cameras: list[Camera | None]) -> int:
-    """First camera the operator may view, else the first input."""
-    for index, camera in enumerate(cameras, start=1):
-        if camera is not None and camera.view:
-            return index
-    return 1
 
 
 def _one_line(value: str) -> str:

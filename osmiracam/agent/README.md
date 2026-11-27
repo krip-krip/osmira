@@ -7,12 +7,24 @@ Programme Python qui tourne sur le Raspberry Pi à côté de `ptzview` :
    (`state/config.json`) ;
 2. écrit `ptzview.conf` à partir de cette configuration ;
 3. lance `ptzview`, le relance s'il s'arrête, et le relance quand la
-   configuration change (vérifiée toutes les `poll_interval_s` secondes) ;
-4. si le Core est injoignable, continue avec la dernière configuration
-   (au démarrage comme en cours de route).
+   configuration change ;
+4. suit le flux d'événements du Core (`GET /api/stations/<id>/events`, SSE) :
+   - `select` : bascule `ptzview` sur la caméra choisie dans la matrice
+     (`/select/N` de l'API locale de `ptzview`, sans relance) ;
+   - `config_changed` : récupère tout de suite la nouvelle configuration ;
+   - `state` (à chaque connexion) : se remet à jour ;
+   - coupure : reconnexion toutes les `events_retry_s` secondes ;
+5. garde aussi une copie de la dernière caméra choisie (`state/selection.json`) :
+   après un redémarrage, `ptzview` repart sur elle, même sans Core ;
+6. vérifie aussi la configuration toutes les `poll_interval_s` secondes, en
+   secours du flux d'événements ;
+7. si le Core est injoignable, continue avec la dernière configuration et la
+   dernière caméra choisie.
 
-Pas encore : bascule depuis la matrice du Core (SSE), tally/UMD, manette,
-pilotage PTZ.
+Si le Core n'a choisi aucune caméra (ou une caméra que le poste ne peut pas
+voir), le poste affiche sa première caméra visible (ADR 0009).
+
+Pas encore : tally/UMD, manette, pilotage PTZ, deuxième sortie HDMI.
 
 ## Limite actuelle de ptzview
 
@@ -41,8 +53,14 @@ Ctrl+C arrête l'agent, qui arrête `ptzview` proprement. Le journal de
 `ptzview` s'affiche dans le même terminal que celui de l'agent.
 
 Côté Core, le poste doit exister et avoir des droits `decode` sur des
-caméras ; changer ces droits (ajout, retrait, ordre) est appliqué par le Pi
-au plus tard `poll_interval_s` secondes après.
+caméras. Changer ces droits (ajout, retrait, ordre) est appliqué aussitôt
+(relance de `ptzview`, quelques secondes de coupure). Choisir une caméra dans
+la matrice bascule sans relance :
+
+```
+curl -X PUT http://<core>:8000/api/stations/panelTest/outputs/1/selection \
+  -H 'Content-Type: application/json' -d '{"camera_id": "cam2"}'
+```
 
 ## Développement
 

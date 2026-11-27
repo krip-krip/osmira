@@ -43,11 +43,13 @@ def settings(tmp_path: Path) -> Settings:
         station_id="panelTest",
         state_dir=tmp_path / "state",
         poll_interval_s=0.01,
+        events_retry_s=0.01,
         ptzview=PtzviewSettings(
             binary=tmp_path / "ptzview",
             conf_path=tmp_path / "state" / "ptzview.conf",
             restart_delay_s=0.01,
             stop_timeout_s=0.2,
+            select_retry_s=1.0,
             general={"hdmi_mode": "1920x1080@50"},
         ),
     )

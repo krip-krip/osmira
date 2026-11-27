@@ -11,8 +11,9 @@ import httpx2
 from osmiracam_agent import __version__
 from osmiracam_agent.agent import Agent
 from osmiracam_agent.core_client import CoreClient
+from osmiracam_agent.ptzview_client import PtzviewClient
 from osmiracam_agent.settings import Settings, load_settings
-from osmiracam_agent.station_config import ConfigStore
+from osmiracam_agent.station_config import ConfigStore, SelectionStore
 from osmiracam_agent.supervisor import Supervisor, ptzview_spawner
 
 
@@ -28,14 +29,20 @@ async def run(settings: Settings) -> None:
         restart_delay_s=ptz.restart_delay_s,
         stop_timeout_s=ptz.stop_timeout_s,
     )
-    async with httpx2.AsyncClient(
-        base_url=settings.core_url, timeout=settings.request_timeout_s
-    ) as http:
+    async with (
+        httpx2.AsyncClient(base_url=settings.core_url, timeout=settings.request_timeout_s) as core,
+        # Local ptzview: short timeout, and never through an HTTP proxy.
+        httpx2.AsyncClient(
+            base_url=f"http://127.0.0.1:{ptz.http_port}", timeout=1.0, trust_env=False
+        ) as local,
+    ):
         agent = Agent(
             settings,
-            CoreClient(http, settings.station_id),
+            CoreClient(core, settings.station_id),
             ConfigStore(settings.state_dir),
             supervisor,
+            PtzviewClient(local),
+            SelectionStore(settings.state_dir),
         )
         await agent.run(stop)
 
