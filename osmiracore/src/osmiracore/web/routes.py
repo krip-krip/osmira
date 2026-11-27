@@ -1,18 +1,16 @@
-"""HTML pages. Thin layer over services, like the REST API."""
+"""Matrix page. Thin layer over services, like the REST API."""
 
-from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 
 from osmiracore.api.deps import BusDep, SessionDep
 from osmiracore.services import selection
 from osmiracore.services.errors import ConflictError, NotFoundError
+from osmiracore.web.templating import STATIC_DIR, TEMPLATES
 
-TEMPLATES = Jinja2Templates(directory=Path(__file__).parent / "templates")
-STATIC_DIR = Path(__file__).parent / "static"
+__all__ = ["STATIC_DIR", "router"]
 
 router = APIRouter(include_in_schema=False)
 
@@ -25,7 +23,9 @@ def home() -> RedirectResponse:
 @router.get("/matrix")
 def matrix_page(request: Request, session: SessionDep) -> HTMLResponse:
     return TEMPLATES.TemplateResponse(
-        request, "matrix.html", {"matrix": selection.build_matrix(session), "error": None}
+        request,
+        "matrix.html",
+        {"active": "matrix", "matrix": selection.build_matrix(session), "error": None},
     )
 
 

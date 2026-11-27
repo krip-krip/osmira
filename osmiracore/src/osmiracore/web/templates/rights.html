@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{{ station.label }} · rights{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="/stations">Stations</a> / <a href="/stations/{{ station.id }}">{{ station.id }}</a> /</p>
+<h1>{{ station.label }}: cameras &amp; rights</h1>
+<p class="hint">
+  <strong>Decode</strong>: the station receives and decodes the stream permanently
+  (counts against max decoders).
+  <strong>View</strong>: it may show it (needs decode).
+  <strong>Control</strong>: it may drive the camera (needs view; used later).
+  <strong>Position</strong>: camera order on the station (cam1…camN of the player).
+  Each row is saved on its own; the station applies changes at once.
+</p>
+{% include "_rights_table.html" %}
+{% endblock %}

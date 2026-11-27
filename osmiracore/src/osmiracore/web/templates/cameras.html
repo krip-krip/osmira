@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Cameras{% endblock %}
+{% block content %}
+<div class="title-row">
+  <h1>Cameras</h1>
+  <a class="button primary" href="/cameras/new">New camera</a>
+</div>
+{% if not cameras %}
+  <p class="empty">No camera yet.</p>
+{% else %}
+<div class="scroll">
+  <table class="list">
+    <thead>
+      <tr><th>Id</th><th>Label</th><th>SRT URL</th><th>Format</th><th>Control</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for c in cameras %}
+      <tr>
+        <td><a href="/cameras/{{ c.id }}">{{ c.id }}</a></td>
+        <td>{{ c.label }}</td>
+        <td class="mono">{{ c.media_srt_url }}</td>
+        <td>{{ c.media_codec|upper }} {{ c.media_height }}p{{ c.media_fps }} · {{ c.media_latency_ms }} ms</td>
+        <td>{% if c.control_driver == "none" %}<span class="muted">none</span>{% else %}{{ c.control_driver }} {{ c.control_host or "" }}{% endif %}</td>
+        <td class="actions"><a href="/cameras/{{ c.id }}">Edit</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

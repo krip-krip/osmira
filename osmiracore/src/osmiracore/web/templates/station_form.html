@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{{ "New station" if is_new else form.id }}{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="/stations">Stations</a> /</p>
+<h1>{{ "New station" if is_new else "Station " ~ form.id }}</h1>
+{% include "_errors.html" %}
+<form method="post" class="form">
+  <fieldset>
+    <legend>Station (one OsmiraCam Raspberry Pi)</legend>
+    <label>Id
+      {% if is_new %}
+        <input name="id" value="{{ form.id }}" required pattern="[A-Za-z0-9_\-]{1,32}" placeholder="panelTest">
+        <small>The <code>station_id</code> in the Pi's agent.toml. Cannot be changed later.</small>
+      {% else %}
+        <input value="{{ form.id }}" disabled>
+      {% endif %}
+    </label>
+    <label>Label <input name="label" value="{{ form.label }}" required maxlength="64" placeholder="Cadreur 1"></label>
+    <label>Max decoders
+      <input name="max_decoders" value="{{ form.max_decoders }}" type="number" min="0">
+      <small>Streams decoded permanently: 4 for a Pi 4 in 1080p50.</small>
+    </label>
+    <label>Video outputs
+      <input name="outputs" value="{{ form.outputs }}" type="number" min="1">
+      <small>Rows of this station in the matrix.</small>
+    </label>
+  </fieldset>
+  <div class="buttons">
+    <button type="submit" class="primary">{{ "Create" if is_new else "Save" }}</button>
+    <a class="button" href="/stations">Cancel</a>
+    {% if not is_new %}<a class="button" href="/stations/{{ form.id }}/rights">Cameras &amp; rights</a>{% endif %}
+  </div>
+</form>
+
+{% if not is_new %}
+<form method="post" action="/stations/{{ form.id }}/delete" class="danger-zone"
+      onsubmit="return confirm('Delete station {{ form.id }}? Its rights and matrix selections go with it.')">
+  <button type="submit" class="danger">Delete this station</button>
+</form>
+{% endif %}
+{% endblock %}

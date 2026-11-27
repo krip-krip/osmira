@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}{{ "New camera" if is_new else form.id }}{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="/cameras">Cameras</a> /</p>
+<h1>{{ "New camera" if is_new else "Camera " ~ form.id }}</h1>
+{% include "_errors.html" %}
+<form method="post" class="form">
+  <fieldset>
+    <legend>Camera</legend>
+    <label>Id
+      {% if is_new %}
+        <input name="id" value="{{ form.id }}" required pattern="[A-Za-z0-9_\-]{1,32}" placeholder="cam1">
+        <small>Letters, digits, - and _. Cannot be changed later.</small>
+      {% else %}
+        <input value="{{ form.id }}" disabled>
+      {% endif %}
+    </label>
+    <label>Label <input name="label" value="{{ form.label }}" required maxlength="64" placeholder="CAM 1"></label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Media (how stations receive the picture)</legend>
+    <label class="wide">SRT URL
+      <input name="srt_url" value="{{ form.srt_url }}" required class="mono"
+             placeholder="srt://192.168.104.253:8890?mode=caller&amp;streamid=read:cam1">
+      <small>Without <code>latency=</code>: the latency is set below.</small>
+    </label>
+    <label>SRT latency (ms) <input name="latency_ms" value="{{ form.latency_ms }}" type="number" min="0" max="10000"></label>
+    <label>Codec
+      <select name="codec">
+        {% for codec in ("hevc", "h264") %}<option value="{{ codec }}" {% if form.codec == codec %}selected{% endif %}>{{ codec|upper }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Width <input name="width" value="{{ form.width }}" type="number" min="1"></label>
+    <label>Height <input name="height" value="{{ form.height }}" type="number" min="1"></label>
+    <label>Frame rate <input name="fps" value="{{ form.fps }}" type="number" min="1" max="120"></label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Control (PTZ, used later by the stations)</legend>
+    <label>Driver <input name="driver" value="{{ form.driver }}" placeholder="none, panasonic_aw…"></label>
+    <label>Host <input name="host" value="{{ form.host }}" placeholder="192.168.105.51"></label>
+    <label>Port <input name="port" value="{{ form.port }}" type="number" min="1" max="65535"></label>
+    <label>Username <input name="username" value="{{ form.username }}" autocomplete="off"></label>
+    <label>Password
+      <input name="password" type="password" autocomplete="new-password"
+             placeholder="{{ 'unchanged (set)' if password_set else 'not set' }}">
+      {% if password_set %}<span class="check"><input type="checkbox" name="clear_password"> clear the stored password</span>{% endif %}
+      <small>Never displayed. Leave empty to keep the current one.</small>
+    </label>
+    <label class="wide">Driver options (JSON) <textarea name="options" rows="2" class="mono">{{ form.options }}</textarea></label>
+  </fieldset>
+
+  <div class="buttons">
+    <button type="submit" class="primary">{{ "Create" if is_new else "Save" }}</button>
+    <a class="button" href="/cameras">Cancel</a>
+  </div>
+</form>
+
+{% if not is_new %}
+<form method="post" action="/cameras/{{ form.id }}/delete" class="danger-zone"
+      onsubmit="return confirm('Delete camera {{ form.id }}? Its station rights and matrix selections go with it.')">
+  <button type="submit" class="danger">Delete this camera</button>
+</form>
+{% endif %}
+{% endblock %}
