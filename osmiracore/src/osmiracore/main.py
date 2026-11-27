@@ -3,6 +3,7 @@
 Run locally: uv run uvicorn osmiracore.main:app --reload
 """
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -11,9 +12,10 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import sessionmaker
 
 from osmiracore import __version__
-from osmiracore.api import cameras, stations
+from osmiracore.api import cameras, matrix, stations
 from osmiracore.db import init_db, make_engine
 from osmiracore.services.errors import ConflictError, NotFoundError
+from osmiracore.services.events import EventBus
 from osmiracore.settings import Settings, load_settings
 
 
@@ -26,6 +28,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         engine = make_engine(settings.db_path)
         init_db(engine)
         app.state.session_factory = sessionmaker(engine, expire_on_commit=False)
+        app.state.bus = EventBus(asyncio.get_running_loop())
+        with app.state.session_factory() as session:
+            app.state.bus.sync(session)  # remember the starting state of every station
         yield
         engine.dispose()
 
@@ -46,6 +51,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(cameras.router)
     app.include_router(stations.router)
+    app.include_router(matrix.router)
     return app
 
 

@@ -1,6 +1,6 @@
 import pytest
 
-STATION = {"id": "panelTest", "label": "Cadreur 1", "max_decoders": 4}
+STATION = {"id": "panelTest", "label": "Cadreur 1", "max_decoders": 4, "outputs": 1}
 CONFIG_URL = "/api/stations/panelTest/config"
 
 

@@ -1,6 +1,6 @@
 import pytest
 
-STATION = {"id": "panelTest", "label": "Cadreur 1", "max_decoders": 4}
+STATION = {"id": "panelTest", "label": "Cadreur 1", "max_decoders": 4, "outputs": 1}
 FULL = {"decode": True, "view": True, "control": True}
 
 
@@ -31,7 +31,7 @@ def test_station_crud(client):
     assert client.get("/api/stations").json() == [STATION]
 
     updated = client.put("/api/stations/panelTest", json={"label": "Cadreur 2"}).json()
-    assert updated == {"id": "panelTest", "label": "Cadreur 2", "max_decoders": 4}
+    assert updated == {**STATION, "label": "Cadreur 2"}
 
     assert client.delete("/api/stations/panelTest").status_code == 204
     assert client.get("/api/stations/panelTest").status_code == 404

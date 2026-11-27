@@ -9,6 +9,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Safety net: an SSE test waiting for a missing event would block forever.
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: osmiracore

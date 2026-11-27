@@ -24,12 +24,13 @@ But : voir les caméras sur le Pi, choisir celles d'une station et la caméra
 affichée depuis le Core. Pas de pilotage PTZ à cette étape.
 - [x] OsmiraCore : API caméras, stations (postes) et droits.
 - [x] OsmiraCore : `GET /api/stations/{id}/config` versionnée (média seul).
-- [ ] OsmiraCore : caméra affichée par station + flux SSE (`select`,
+- [x] OsmiraCore : caméra affichée par sortie (matrice) + flux SSE (`select`,
   `config_changed`).
 - [ ] Agent OsmiraCam minimal : récupère sa config, la garde en local, lance
   `ptzview` et le relance quand la config change.
 - [ ] Agent : écoute le SSE et bascule `ptzview`.
-- [ ] Interface web : caméras, stations, droits, boutons de bascule.
+- [ ] Interface web : caméras, stations, droits, matrice de bascule
+  (sources en colonnes, sorties des stations en lignes).
 - [ ] `ptzview` : nombre de caméras configurable, rechargement de la config
   sans redémarrage.
 - [ ] Tally/UMD par SSE.

@@ -61,6 +61,8 @@ class StationUpdate(StrictModel):
     label: Annotated[str, Field(min_length=1, max_length=64)]
     # Hardware capacity of this station, no global limit (4 for a Pi 4 in 1080p50).
     max_decoders: Annotated[int, Field(ge=0)] = 4
+    # Number of video outputs (destinations in the matrix).
+    outputs: Annotated[int, Field(ge=1)] = 1
 
 
 class StationCreate(StationUpdate):
@@ -106,6 +108,37 @@ class ConfigCamera(StrictModel):
     media: Media
     # Camera control (PTZ) is planned but not sent yet: the "control" block
     # will be added here when the agent gets its camera drivers.
+
+
+class SelectionIn(StrictModel):
+    camera_id: Identifier
+
+
+class OutputSelection(StrictModel):
+    output: int
+    # None: the Core has not chosen a camera for this output.
+    camera_id: str | None
+
+
+class MatrixSource(StrictModel):
+    camera_id: str
+    label: str
+
+
+class MatrixDestination(StrictModel):
+    station_id: str
+    station_label: str
+    output: int
+    selected: str | None
+    # Cameras this output may show (station has the "view" right on them).
+    allowed: list[str]
+
+
+class Matrix(StrictModel):
+    """Routing matrix: sources (cameras) x destinations (station outputs)."""
+
+    sources: list[MatrixSource]
+    destinations: list[MatrixDestination]
 
 
 class StationConfig(StrictModel):
