@@ -39,6 +39,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             app.state.bus.sync(session)  # remember the starting state of every station
         # SRT statistics from the media servers (ADR 0010). Local servers: no proxy.
         async with httpx2.AsyncClient(timeout=3.0, trust_env=False) as http:
+            app.state.http = http  # also used for live MediaMTX queries
             app.state.srt_collector = SrtCollector(
                 app.state.session_factory,
                 http,

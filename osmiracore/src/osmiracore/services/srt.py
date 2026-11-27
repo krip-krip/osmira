@@ -28,7 +28,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from osmiracore.models import Camera, MediaServer, SrtSample
-from osmiracore.schemas import MediaServerState, SourceMedia, SrtLink
+from osmiracore.schemas import ExposedMedia, ExposedPath, MediaServerState, SourceMedia, SrtLink
 
 log = logging.getLogger(__name__)
 
@@ -161,6 +161,19 @@ class SrtCollector:
 
     def source_of(self, camera: Camera) -> SourceMedia | None:
         """The camera's stream as a media server sees it (codec, size, ready)."""
+        if camera.media_server_id and camera.media_path:
+            state = self.states.get(camera.media_server_id)
+            info = state.paths.get(camera.media_path) if state else None
+            if info is None:
+                return None
+            return SourceMedia(
+                server_id=camera.media_server_id,
+                path=camera.media_path,
+                ready=info.ready,
+                codec=info.codec,
+                width=info.width,
+                height=info.height,
+            )
         found = stream_path(camera.media_srt_url)
         if found is None:
             return None
@@ -197,20 +210,12 @@ class SrtCollector:
             session.commit()
 
     async def _get(self, server: MediaServer, path: str) -> Any:  # noqa: ANN401  (JSON)
-        auth = (server.api_username, server.api_password or "") if server.api_username else None
-        response = await self._http.get(f"{server.api_url}{path}", auth=auth)
-        response.raise_for_status()
-        return response.json()
+        return await mediamtx_get(self._http, server, path)
 
     async def _collect_server(
         self, server: MediaServer, cameras: Iterable[Camera], state: ServerState, now: float
     ) -> list[SrtSample]:
-        host = _host(server.api_url)
-        camera_of_path: dict[str, str] = {}
-        for camera in cameras:
-            found = stream_path(camera.media_srt_url)
-            if found is not None and found[0] == host:
-                camera_of_path.setdefault(found[1], camera.id)
+        camera_of_path = cameras_by_path(server, cameras)
 
         info = await self._get(server, "/v3/info")
         state.version = info.get("version")
@@ -263,6 +268,71 @@ class SrtCollector:
                 )
             )
         return samples
+
+
+def cameras_by_path(server: MediaServer, cameras: Iterable[Camera]) -> dict[str, str]:
+    """MediaMTX path -> camera id: cameras declared on this server first, then
+    cameras whose SRT URL points to the server's host (override, older data)."""
+    found: dict[str, str] = {}
+    for camera in cameras:
+        if camera.media_server_id == server.id and camera.media_path:
+            found.setdefault(camera.media_path, camera.id)
+    host = _host(server.api_url)
+    for camera in cameras:
+        url_path = stream_path(camera.media_srt_url)
+        if url_path is not None and url_path[0] == host:
+            found.setdefault(url_path[1], camera.id)
+    return found
+
+
+async def mediamtx_get(http: httpx2.AsyncClient, server: MediaServer, path: str) -> Any:  # noqa: ANN401
+    """GET on the MediaMTX API of a server (JSON), with its credentials if any."""
+    auth = (server.api_username, server.api_password or "") if server.api_username else None
+    response = await http.get(f"{server.api_url}{path}", auth=auth)
+    response.raise_for_status()
+    return response.json()
+
+
+async def exposed_media(
+    http: httpx2.AsyncClient, server: MediaServer, cameras: Iterable[Camera]
+) -> ExposedMedia:
+    """What the media server exposes right now, read live from its API."""
+    users: dict[str, list[str]] = {}
+    for camera in cameras:
+        if camera.media_server_id == server.id and camera.media_path:
+            users.setdefault(camera.media_path, []).append(camera.id)
+    try:
+        config = await mediamtx_get(http, server, "/v3/config/global/get")
+        items = (await mediamtx_get(http, server, "/v3/paths/list?itemsPerPage=1000"))["items"]
+    except (httpx2.HTTPError, ValueError, KeyError, TypeError) as exc:
+        return ExposedMedia(
+            server_id=server.id,
+            reachable=False,
+            error=f"{type(exc).__name__}: {exc}",
+            srt_address_detected=None,
+            paths=[],
+        )
+    srt = str(config.get("srtAddress") or "")
+    port = srt.rsplit(":", 1)[-1] if ":" in srt else ""
+    detected = f"{_host(server.api_url)}:{port}" if config.get("srt", True) and port else None
+    paths = []
+    for item in sorted(items, key=lambda i: i.get("name", "")):
+        info = _path_info(item)
+        paths.append(
+            ExposedPath(
+                name=item["name"],
+                ready=info.ready,
+                source_type=info.source_type,
+                codec=info.codec,
+                width=info.width,
+                height=info.height,
+                readers=len(item.get("readers") or []),
+                cameras=users.get(item["name"], []),
+            )
+        )
+    return ExposedMedia(
+        server_id=server.id, reachable=True, error=None, srt_address_detected=detected, paths=paths
+    )
 
 
 def _path_info(path: dict[str, Any]) -> PathInfo:

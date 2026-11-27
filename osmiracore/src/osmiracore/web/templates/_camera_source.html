@@ -1,0 +1,70 @@
+{#- Source block of the camera form, redrawn by htmx whenever it changes. -#}
+<fieldset id="source" hx-post="/cameras/source" hx-trigger="change" hx-include="closest form"
+          hx-target="this" hx-swap="outerHTML">
+  <legend>Source (how stations receive the picture)</legend>
+
+  <div class="choices wide" role="radiogroup" aria-label="source">
+    <label class="choice">
+      <input type="radio" name="source" value="media_server" {% if form.source == "media_server" %}checked{% endif %}>
+      <span><strong>Via a media server</strong><small>A path of a MediaMTX the stations read from.</small></span>
+    </label>
+    <label class="choice">
+      <input type="radio" name="source" value="direct" {% if form.source == "direct" %}checked{% endif %}>
+      <span><strong>Direct from the camera</strong><small>SRT between the camera and the station.</small></span>
+    </label>
+  </div>
+
+  {% if form.source == "media_server" %}
+    {% if not servers %}
+      <p class="note wide warn">No media server yet: <a href="/media-servers/new">declare one</a>, or choose Direct.</p>
+    {% else %}
+      <label>Media server
+        <select name="media_server_id">
+          {% for s in servers %}<option value="{{ s.id }}" {% if s.id == form.media_server_id %}selected{% endif %}>{{ s.label }} ({{ s.id }})</option>{% endfor %}
+        </select>
+        {% if server %}<small>SRT {{ server.srt_address }} · <a href="/media-servers/{{ server.id }}/media" target="_blank">exposed media</a></small>{% endif %}
+      </label>
+      <label>Path
+        <input name="path" value="{{ form.path }}" list="paths" autocomplete="off" placeholder="cam1"
+               pattern="[^\s:?&amp;]{1,200}">
+        {% if server %}
+        <span id="path-options" hx-get="/media-servers/{{ server.id }}/path-options" hx-trigger="load"
+              hx-swap="outerHTML"><small class="muted">reading the paths of {{ server.id }}…</small></span>
+        {% endif %}
+      </label>
+    {% endif %}
+  {% else %}
+    <label>Station mode
+      <select name="direct_mode">
+        <option value="caller" {% if form.direct_mode != "listener" %}selected{% endif %}>Caller (the station calls the camera)</option>
+        <option value="listener" {% if form.direct_mode == "listener" %}selected{% endif %}>Listener (the camera calls the station)</option>
+      </select>
+    </label>
+    <label>{{ "Camera address" if form.direct_mode != "listener" else "Listen address (optional)" }}
+      <input name="direct_host" value="{{ form.direct_host }}" autocomplete="off"
+             placeholder="{{ '192.168.105.51' if form.direct_mode != 'listener' else 'all addresses' }}">
+    </label>
+    <label>SRT port
+      <input name="direct_port" value="{{ form.direct_port }}" type="number" min="1" max="65535" placeholder="2020">
+    </label>
+    {% if form.direct_mode == "listener" %}
+    <p class="note wide">Listener: the camera must call this station's address on this port. Only one
+      station can receive a camera this way.</p>
+    {% endif %}
+  {% endif %}
+
+  <div class="url wide">
+    <span class="muted">Computed URL</span>
+    <code id="computed-url">{{ computed or "— incomplete source —" }}</code>
+  </div>
+  <label class="wide">Override URL
+    <span class="override">
+      <input name="srt_url" id="srt-url" value="{{ form.srt_url }}" class="mono" autocomplete="off"
+             placeholder="empty: use the computed URL">
+      <button type="button" onclick="document.getElementById('srt-url').value=''; this.closest('fieldset').dispatchEvent(new Event('change', {bubbles: true}))"
+              {% if not form.srt_url %}disabled{% endif %}>Use computed URL</button>
+    </span>
+    {% if form.srt_url %}<small class="warn">Override active: stations use this URL, not the computed one.</small>
+    {% else %}<small>Leave empty to follow the source (the URL then changes with it).</small>{% endif %}
+  </label>
+</fieldset>

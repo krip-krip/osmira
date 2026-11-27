@@ -13,8 +13,26 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+SrtUrl = Annotated[str, Field(pattern=r"^srt://", max_length=500)]
+
+
 class Media(StrictModel):
-    srt_url: Annotated[str, Field(pattern=r"^srt://", max_length=500)]
+    """How the stations receive the picture.
+
+    source "media_server": a path of a media server (the station calls it).
+    source "direct": straight from the camera, the station as SRT caller (it
+    calls host:port) or listener (it waits for the camera on port).
+    srt_url: send it only to impose a URL instead of the computed one; null or
+    the computed URL itself means "use the computed URL".
+    """
+
+    source: Literal["media_server", "direct"] = "direct"
+    media_server_id: Identifier | None = None
+    path: Annotated[str, Field(pattern=r"^[^\s:?&]{1,200}$")] | None = None
+    mode: Literal["caller", "listener"] = "caller"
+    host: Annotated[str, Field(pattern=r"^[A-Za-z0-9.\-\[\]:]{1,253}$")] | None = None
+    port: Annotated[int, Field(ge=1, le=65535)] | None = None
+    srt_url: SrtUrl | None = None
     latency_ms: Annotated[int, Field(ge=0, le=10_000)] = 20
     # Expected format. None = auto: nothing declared, the stations play what
     # they receive and the Core shows what was actually received.
@@ -22,6 +40,43 @@ class Media(StrictModel):
     width: Annotated[int, Field(gt=0, le=7680)] | None = None
     height: Annotated[int, Field(gt=0, le=4320)] | None = None
     fps: Annotated[int, Field(gt=0, le=120)] | None = None
+
+    @model_validator(mode="after")
+    def check_source(self) -> Self:
+        if self.source == "media_server":
+            if not self.media_server_id:
+                raise ValueError("a media server is required for source 'media_server'")
+            if not self.path and not self.srt_url:
+                raise ValueError("a path (or an SRT URL) is required for source 'media_server'")
+        elif not self.srt_url:
+            if not self.port:
+                raise ValueError("a port (or an SRT URL) is required for source 'direct'")
+            if self.mode == "caller" and not self.host:
+                raise ValueError("a host (or an SRT URL) is required in caller mode")
+        return self
+
+
+class MediaOut(Media):
+    # Effective URL sent to the stations (override or computed).
+    srt_url: str
+    # URL computed from the source (None if it cannot be computed).
+    srt_url_computed: str | None
+    srt_url_overridden: bool
+
+    @model_validator(mode="after")
+    def check_source(self) -> Self:  # stored data is already valid
+        return self
+
+
+class ConfigMedia(StrictModel):
+    """What a station needs to receive the picture."""
+
+    srt_url: str
+    latency_ms: int
+    codec: str | None
+    width: int | None
+    height: int | None
+    fps: int | None
 
 
 class ReceivedMedia(StrictModel):
@@ -77,7 +132,7 @@ class CameraCreate(CameraUpdate):
 class CameraOut(StrictModel):
     id: str
     label: str
-    media: Media
+    media: MediaOut
     control: ControlOut
     # What online stations actually receive (None: no station streams it now).
     received: ReceivedMedia | None = None
@@ -135,7 +190,7 @@ class ConfigCamera(StrictModel):
     label: str
     position: int
     rights: RightLevels
-    media: Media
+    media: ConfigMedia
     # Camera control (PTZ) is planned but not sent yet: the "control" block
     # will be added here when the agent gets its camera drivers.
 
@@ -236,6 +291,8 @@ class StationConfig(StrictModel):
 class MediaServerUpdate(StrictModel):
     label: Annotated[str, Field(min_length=1, max_length=64)]
     api_url: Annotated[str, Field(pattern=r"^https?://", max_length=300)]
+    # host:port where stations read SRT; empty: API host and port 8890.
+    srt_address: Annotated[str, Field(pattern=r"^[A-Za-z0-9.\-\[\]]+:\d{1,5}$")] | None = None
     api_username: Annotated[str, Field(max_length=100)] | None = None
     # Write-only. On update: absent or null keeps it, "" clears it.
     api_password: Annotated[str, Field(max_length=200)] | None = None
@@ -260,6 +317,7 @@ class MediaServerOut(StrictModel):
     id: str
     label: str
     api_url: str
+    srt_address: str
     api_username: str | None
     password_set: bool
     enabled: bool
@@ -291,3 +349,26 @@ class SrtLink(StrictModel):
     packets_lost: int | None
     packets_retrans: int | None
     packets_dropped: int | None
+
+
+class ExposedPath(StrictModel):
+    """A media exposed by a media server, read live from its API."""
+
+    name: str
+    ready: bool
+    source_type: str | None
+    codec: str | None
+    width: int | None
+    height: int | None
+    readers: int
+    # Cameras of the Core already using this path.
+    cameras: list[str] = Field(default_factory=list)
+
+
+class ExposedMedia(StrictModel):
+    server_id: str
+    reachable: bool
+    error: str | None
+    # host:port read in the MediaMTX configuration (srtAddress).
+    srt_address_detected: str | None
+    paths: list[ExposedPath]

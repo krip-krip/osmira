@@ -5,6 +5,8 @@
 <h1>{{ "New camera" if is_new else "Camera " ~ form.id }}</h1>
 {% include "_errors.html" %}
 <form method="post" class="form">
+  {% include "_camera_source.html" %}
+
   <fieldset>
     <legend>Camera</legend>
     <label>Id
@@ -19,12 +21,7 @@
   </fieldset>
 
   <fieldset>
-    <legend>Media (how stations receive the picture)</legend>
-    <label class="wide">SRT URL
-      <input name="srt_url" value="{{ form.srt_url }}" required class="mono"
-             placeholder="srt://192.168.104.253:8890?mode=caller&amp;streamid=read:cam1">
-      <small>Without <code>latency=</code>: the latency is set below.</small>
-    </label>
+    <legend>Stream</legend>
     <label>SRT latency (ms) <input name="latency_ms" value="{{ form.latency_ms }}" type="number" min="0" max="10000"></label>
     <label>Codec
       <select name="codec">

@@ -131,3 +131,17 @@ table.stations td { vertical-align: top; }
 td.hardware { white-space: normal; min-width: 14rem; }
 .note { color: var(--muted); font-size: 0.85rem; margin: 0; grid-column: 1 / -1; }
 .warn.sub { color: #e0a020; }
+
+/* --- camera source ------------------------------------------------------------ */
+.choices { display: flex; gap: 0.8rem; flex-wrap: wrap; }
+.choice { flex-direction: row; align-items: flex-start; gap: 0.6rem; padding: 0.6rem 0.8rem;
+  border: 1px solid var(--line); border-radius: 8px; cursor: pointer; min-width: 16rem; }
+.choice:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.choice span { display: flex; flex-direction: column; gap: 0.15rem; }
+.choice small { color: var(--muted); }
+.url { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.9rem; }
+.url code { padding: 0.45rem 0.6rem; border: 1px dashed var(--line); border-radius: 6px; overflow-wrap: anywhere; }
+.override { display: flex; gap: 0.5rem; }
+.override input { flex: 1; }
+button:disabled { opacity: 0.45; cursor: default; }
+.badge { display: inline-block; font-size: 0.75rem; padding: 0 0.4rem; border: 1px solid currentColor; border-radius: 999px; margin-left: 0.3rem; }

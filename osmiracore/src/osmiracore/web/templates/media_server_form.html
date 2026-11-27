@@ -17,8 +17,10 @@
     <label>Label <input name="label" value="{{ form.label }}" required maxlength="64" placeholder="MediaMTX régie"></label>
     <label class="wide">API URL
       <input name="api_url" value="{{ form.api_url }}" required class="mono" placeholder="http://192.168.104.253:9997">
-      <small>The <code>apiAddress</code> of MediaMTX. Cameras whose SRT URL uses the same host are matched to its paths.</small>
+      <small>The <code>apiAddress</code> of MediaMTX (read only: the Core never changes it).</small>
     </label>
+    {% set message = none %}{% set ok = true %}
+    {% include "_srt_address.html" %}
     <label>API username <input name="api_username" value="{{ form.api_username }}" autocomplete="off"></label>
     <label>API password
       <input name="api_password" type="password" autocomplete="new-password"
@@ -35,6 +37,7 @@
   </div>
 </form>
 {% if not is_new %}
+<p><a class="button" href="/media-servers/{{ form.id }}/media">Exposed media</a></p>
 <form method="post" action="/media-servers/{{ form.id }}/delete" class="danger-zone"
       onsubmit="return confirm('Delete media server {{ form.id }}? Recorded statistics are kept.')">
   <button type="submit" class="danger">Delete this media server</button>

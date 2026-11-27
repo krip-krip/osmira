@@ -1,0 +1,12 @@
+<span id="path-options">
+  <datalist id="paths">
+    {% for p in found.paths %}
+    <option value="{{ p.name }}">{{ "ready" if p.ready else "not ready" }}{% if p.codec %} · {{ p.codec|upper }}{% endif %}{% if p.width %} {{ p.width }}x{{ p.height }}{% endif %} · {{ p.readers }} reader{{ "s" if p.readers != 1 }}</option>
+    {% endfor %}
+  </datalist>
+  {% if found.reachable %}
+    <small>{{ found.paths|length }} path{{ "s" if found.paths|length != 1 }} on {{ found.server_id }}: start typing or pick one.</small>
+  {% else %}
+    <small class="warn">{{ found.server_id }} unreachable ({{ found.error }}): type the path.</small>
+  {% endif %}
+</span>

@@ -34,8 +34,21 @@ Les erreurs renvoient `{"detail": "<message lisible>"}`.
 - `PUT /api/cameras/{id}` → remplacement complet
 - `DELETE /api/cameras/{id}` → supprime aussi ses droits (`204`)
 
-Dans `media`, seuls `srt_url` et `latency_ms` (20 par défaut) comptent pour les
-postes ; `codec`, `width`, `height`, `fps` sont facultatifs (`null` = auto).
+Source de l'image (ADR 0011) : `source` = `media_server` (avec
+`media_server_id` et `path`) ou `direct` (avec `mode` `caller` | `listener`,
+`host`, `port`). Le Core calcule l'URL SRT ; `srt_url` en écriture **impose**
+une autre URL (absent, `null` ou égal à l'URL calculée = URL calculée). En
+lecture : `srt_url` (effective), `srt_url_computed`, `srt_url_overridden`.
+
+```
+curl -X POST localhost:8000/api/cameras -H 'Content-Type: application/json' -d '{
+  "id": "cam1", "label": "CAM 1",
+  "media": {"source": "media_server", "media_server_id": "mtx", "path": "cam1"}}'
+# → srt_url = srt://192.168.104.253:8890?mode=caller&streamid=read:cam1
+```
+
+Les postes ne reçoivent que `srt_url` (effective), `latency_ms` (20 par défaut)
+et le format attendu ; `codec`, `width`, `height`, `fps` sont facultatifs (`null` = auto).
 La lecture ajoute `received` (format réellement reçu par un poste en ligne :
 `station_id`, `width`, `height`, `fps`, `seconds_since`, ou `null`) et
 `warnings` (valeurs déclarées différentes du flux reçu).
@@ -191,6 +204,14 @@ curl -N localhost:8000/api/stations/panelTest/events
   "api_username": null, "api_password": null, "enabled": true}`. Mot de passe en
   écriture seule (`password_set`). La lecture ajoute `state` : `reachable`,
   `last_ok`, `last_error`, `version` de MediaMTX, nombre de chemins (`paths`).
+- `srt_address` du serveur : hôte:port appelé par les postes (vide à la
+  création = hôte de l'API, port 8890). Le changer recalcule l'URL des caméras
+  qui l'utilisent (sauf URL imposée). `DELETE` refusé (`409`) si des caméras
+  l'utilisent.
+- `GET /api/media-servers/{id}/paths` : médias exposés, lus **en direct** dans
+  MediaMTX : `reachable`, `error`, `srt_address_detected` (lu dans la config
+  MediaMTX) et `paths` (`name`, `ready`, `source_type`, `codec`, `width`,
+  `height`, `readers`, `cameras` du Core qui l'utilisent).
 - `GET /api/srt/links` : liaisons vues dans les 15 dernières secondes.
 
 | Champ | Sens |

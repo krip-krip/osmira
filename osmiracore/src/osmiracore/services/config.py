@@ -7,8 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from osmiracore.models import Camera, Right
-from osmiracore.schemas import ConfigCamera, RightLevels, StationConfig
-from osmiracore.services import cameras, stations
+from osmiracore.schemas import ConfigCamera, ConfigMedia, RightLevels, StationConfig
+from osmiracore.services import stations
 
 
 def build_station_config(session: Session, station_id: str) -> StationConfig:
@@ -27,7 +27,14 @@ def build_station_config(session: Session, station_id: str) -> StationConfig:
             label=camera.label,
             position=right.position,
             rights=RightLevels(decode=right.decode, view=right.view, control=right.control),
-            media=cameras.to_out(camera).media,
+            media=ConfigMedia(
+                srt_url=camera.media_srt_url,
+                latency_ms=camera.media_latency_ms,
+                codec=camera.media_codec,
+                width=camera.media_width,
+                height=camera.media_height,
+                fps=camera.media_fps,
+            ),
         )
         for right, camera in rows
     ]

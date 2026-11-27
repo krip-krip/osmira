@@ -1,0 +1,10 @@
+<label class="wide" id="srt-address">SRT address for the stations
+  <span class="override">
+    <input name="srt_address" value="{{ form.srt_address }}" class="mono" autocomplete="off"
+           placeholder="empty: API host, port 8890" pattern="[A-Za-z0-9.\-\[\]]+:\d{1,5}">
+    <button type="button" hx-post="/media-servers/detect" hx-include="closest form"
+            hx-target="#srt-address" hx-swap="outerHTML">Detect</button>
+  </span>
+  {% if message %}<small class="{{ 'ok' if ok else 'warn' }}">{{ message }}</small>
+  {% else %}<small>host:port the stations call to read streams (<code>srtAddress</code> of MediaMTX). Detect reads it from MediaMTX.</small>{% endif %}
+</label>

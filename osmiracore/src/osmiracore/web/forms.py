@@ -35,6 +35,14 @@ class FormError(Exception):
 class CameraForm(BaseModel):
     id: str = ""
     label: str = ""
+    # Source of the picture (see schemas.Media).
+    source: str = "media_server"
+    media_server_id: str = ""
+    path: str = ""
+    direct_mode: str = "caller"
+    direct_host: str = ""
+    direct_port: str = ""
+    # Imposed URL; empty: the computed URL is used.
     srt_url: str = ""
     latency_ms: str = "20"
     # Empty = auto: nothing declared.
@@ -55,7 +63,13 @@ class CameraForm(BaseModel):
         return cls(
             id=camera.id,
             label=camera.label,
-            srt_url=camera.media_srt_url,
+            source=camera.media_source,
+            media_server_id=camera.media_server_id or "",
+            path=camera.media_path or "",
+            direct_mode=camera.direct_mode or "caller",
+            direct_host=camera.direct_host or "",
+            direct_port=_text(camera.direct_port),
+            srt_url=camera.srt_url_override or "",
             latency_ms=str(camera.media_latency_ms),
             codec=camera.media_codec or "",
             width=_text(camera.media_width),
@@ -88,7 +102,20 @@ class CameraForm(BaseModel):
         return {
             "label": self.label.strip(),
             "media": {
-                "srt_url": self.srt_url.strip(),
+                "source": self.source,
+                **(
+                    {
+                        "media_server_id": self.media_server_id or None,
+                        "path": self.path.strip() or None,
+                    }
+                    if self.source == "media_server"
+                    else {
+                        "mode": self.direct_mode,
+                        "host": self.direct_host.strip() or None,
+                        "port": self.direct_port.strip() or None,
+                    }
+                ),
+                "srt_url": self.srt_url.strip() or None,
                 "latency_ms": self.latency_ms,
                 "codec": self.codec or None,
                 "width": self.width.strip() or None,
@@ -166,6 +193,7 @@ class MediaServerForm(BaseModel):
     id: str = ""
     label: str = ""
     api_url: str = ""
+    srt_address: str = ""  # empty: API host, port 8890
     api_username: str = ""
     api_password: str = ""  # empty on edit: keep the stored password
     clear_password: bool = False
@@ -177,6 +205,7 @@ class MediaServerForm(BaseModel):
             id=server.id,
             label=server.label,
             api_url=server.api_url,
+            srt_address=server.srt_address,
             api_username=server.api_username or "",
             enabled=server.enabled,
         )
@@ -192,6 +221,7 @@ class MediaServerForm(BaseModel):
         return {
             "label": self.label.strip(),
             "api_url": self.api_url.strip(),
+            "srt_address": self.srt_address.strip() or None,
             "api_username": self.api_username.strip() or None,
             "api_password": password,
             "enabled": self.enabled,
@@ -213,3 +243,18 @@ def _message(error: Any) -> str:  # noqa: ANN401  (pydantic error dict)
     where = " ".join(str(part) for part in error["loc"] if part not in ("body",))
     text = error["msg"].removeprefix("Value error, ")
     return f"{where}: {text}" if where else text
+
+
+def preview_camera(form: CameraForm, server: MediaServer | None) -> Camera:
+    """Unsaved camera built from the form, to compute its URL while typing."""
+    port = form.direct_port.strip()
+    return Camera(
+        id=form.id or "new",
+        media_source=form.source,
+        media_server=server if form.source == "media_server" else None,
+        media_server_id=server.id if server and form.source == "media_server" else None,
+        media_path=form.path.strip() or None,
+        direct_mode=form.direct_mode,
+        direct_host=form.direct_host.strip() or None,
+        direct_port=int(port) if port.isdigit() else None,
+    )

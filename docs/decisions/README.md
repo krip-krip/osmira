@@ -30,6 +30,7 @@ Règles :
 | [0008](0008-pile-osmiracore.md) | Pile technique d'OsmiraCore (uv, SQLAlchemy, Jinja2 + htmx, version par empreinte) | Accepté |
 | [0009](0009-bascule-depuis-le-core.md) | Choix de la caméra affichée depuis le Core (matrice) | Accepté |
 | [0010](0010-stats-srt-depuis-mediamtx.md) | Statistiques SRT lues par le Core dans l'API MediaMTX | Accepté |
+| [0011](0011-source-des-cameras.md) | Source d'une caméra : serveur média ou direct, URL calculée ou imposée | Accepté |
 
 ## Modèle
 
