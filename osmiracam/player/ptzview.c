@@ -43,6 +43,22 @@
 #include <cairo.h>
 #include <microhttpd.h>
 
+/*
+ * Workaround for libsrt 1.5.4 (Debian trixie): srt_startup() only counts its
+ * first call (it returns early once the library runs) while every
+ * srt_cleanup() decrements the count. FFmpeg calls both for each SRT input,
+ * so the first input that closes or fails to connect shuts the whole library
+ * down and breaks every other SRT connection of the process ("EID ... no
+ * sockets to check"). ptzview defines srt_cleanup() as a no-op: the library
+ * stays up while ptzview runs and the system frees it at exit. Linked with
+ * -rdynamic so that libavformat calls this definition (ADR 0012).
+ */
+int srt_cleanup(void);
+int srt_cleanup(void)
+{
+    return 0;
+}
+
 #define NCAM 4
 #define LABEL_MAX 96
 #define MAX_PLANES 32

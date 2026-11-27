@@ -67,6 +67,6 @@ affichée depuis le Core. Pas de pilotage PTZ à cette étape.
 - Latence de bout en bout à mesurer sur place.
 - Stabilité de la CMA sur une endurance de 30 min et plus. Essai du 27/11 :
   CMA libre 21–28 Mo (basse), coupure simultanée des 4 flux quand un seul cale
-  (`ptzview`, à examiner) ; voir `mesures/2026-11-27-endurance-30min.md`.
+  (défaut libsrt 1.5.4, contourné : ADR 0012) ; voir `mesures/2026-11-27-endurance-30min.md`.
 - Comportement de chaque marque de caméra si elle ne reçoit plus de commandes.
 - Nom définitif du moteur vidéo (`ptzview` aujourd'hui).
