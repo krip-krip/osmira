@@ -161,3 +161,35 @@ class SrtSample(Base):
     packets_retrans: Mapped[int | None]
     packets_dropped: Mapped[int | None]  # too late to be played: picture damage
     buffer_ms: Mapped[float | None]
+
+
+class StationSample(Base):
+    """What a station reports about each stream it receives, every few seconds
+    (from its status). Gives the receiver side of every link, and the only
+    statistics of direct camera -> station links for now.
+
+    camera_id None: station-wide figures (temperature, free CMA).
+    """
+
+    __tablename__ = "station_samples"
+    __table_args__ = (
+        Index("ix_station_samples_ts", "ts"),
+        Index("ix_station_samples_station", "station_id", "ts"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    ts: Mapped[float]  # Core clock when the status was received
+    station_id: Mapped[str]
+    camera_id: Mapped[str | None]
+    # How the camera reached the station at that time (None, None: direct).
+    via_server_id: Mapped[str | None]
+    via_path: Mapped[str | None]
+    state: Mapped[str | None]
+    fps: Mapped[float | None]
+    mbps: Mapped[float | None]
+    width: Mapped[int | None]
+    height: Mapped[int | None]
+    connects: Mapped[int | None]  # cumulative since the player started
+    decode_errors: Mapped[int | None]  # cumulative since the player started
+    temp_c: Mapped[float | None]
+    cma_free_mb: Mapped[float | None]

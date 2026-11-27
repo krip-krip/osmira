@@ -228,6 +228,28 @@ curl -N localhost:8000/api/stations/panelTest/events
   `path`, `ready`, `codec`, `width`, `height`) ; un codec déclaré différent
   donne un `warning`.
 
+### Liaisons (historique)
+
+- `GET /api/links?since=<ISO>&until=<ISO>` : toutes les liaisons vues sur la
+  période (par défaut depuis le démarrage du Core), actives ou terminées, une
+  par **paire de bouts** :
+  - `camera_server` : caméra → serveur média (MediaMTX, côté réception) ;
+  - `server_station` : serveur média → poste (MediaMTX côté envoi + ce que le
+    poste remonte) ; lecteur non signé : `station_id` = `?<adresse>` ;
+  - `camera_station` : caméra → poste en direct (ce que le poste remonte).
+
+  Champs : `id`, `kind`, `camera_id`, `server_id`, `path`, `station_id`,
+  `active`, `first_seen`, `last_seen`, `duration_s` ; SRT (`null` en direct) :
+  `connections`, `packets`, `packets_lost`, `packets_retrans`,
+  `packets_dropped`, `loss_percent`, `rtt_avg_ms`, `rtt_max_ms`, `mbps_avg` ;
+  poste (`null` côté caméra → serveur) : `fps_avg`, `fps_min`, `no_picture_s`
+  (temps sans image), `decode_errors`, `reconnects`. Les connexions
+  successives et redémarrages du lecteur sont additionnés.
+- `GET /api/links/series?id=<id>&since=&until=&points=600` : courbes d'une
+  liaison par tranches de temps (`t`, `rtt_ms`, `mbps`, `loss_percent`,
+  `retrans_per_s`, `dropped`, `fps`, `station_mbps`, `decode_errors` ; `null` =
+  pas de donnée).
+
 ## Prévu (incréments suivants, à préciser le moment venu)
 
 - Événements `tally` (`{"camera_id", "tally"}`) et `umd`

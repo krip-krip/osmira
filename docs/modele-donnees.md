@@ -117,6 +117,17 @@ si la sortie n'existe plus.
   `packets`, `packets_lost`, `packets_retrans`, `packets_dropped`, `buffer_ms`.
   Pas de clé étrangère : l'historique survit aux caméras et postes supprimés.
 
+## StationSample (ce que remonte un poste)
+
+Une ligne par caméra reçue à chaque état d'un poste (toutes les 5 s), plus une
+ligne par poste (`camera_id` vide : température, CMA libre). Champs : `ts`,
+`station_id`, `camera_id`, `via_server_id` et `via_path` (comment la caméra
+arrivait à ce moment ; vides = en direct), `state`, `fps`, `mbps`, `width`,
+`height`, `connects`, `decode_errors` (cumulés depuis le lancement du lecteur),
+`temp_c`, `cma_free_mb`. Purgé avec les relevés SRT (7 jours). C'est la seule
+source de statistiques des liaisons directes pour l'instant (les vraies stats
+SRT côté poste demanderont une évolution de `ptzview`).
+
 ## Prévu, hors incrément 1
 
 - **Site** : `id`, `label`, adresse du MediaMTX, réseau caméras.

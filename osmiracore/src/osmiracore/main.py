@@ -5,6 +5,7 @@ Run locally: uv run uvicorn osmiracore.main:app --reload
 
 import asyncio
 import contextlib
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -15,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import sessionmaker
 
 from osmiracore import __version__
-from osmiracore.api import cameras, matrix, media_servers, srt, stations
+from osmiracore.api import cameras, links, matrix, media_servers, srt, stations
 from osmiracore.db import init_db, make_engine
 from osmiracore.services.errors import ConflictError, NotFoundError
 from osmiracore.services.events import EventBus
@@ -59,6 +60,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(title="OsmiraCore", version=__version__, lifespan=lifespan)
     app.state.settings = settings
+    app.state.started_at = time.time()  # default start of the Links period
 
     @app.exception_handler(NotFoundError)
     async def not_found(_request: Request, exc: NotFoundError) -> JSONResponse:
@@ -78,6 +80,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(matrix.router)
     app.include_router(media_servers.router)
     app.include_router(srt.router)
+    app.include_router(links.router)
     app.include_router(web.router)
     app.include_router(admin.router)
     app.include_router(media.router)
