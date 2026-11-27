@@ -9,6 +9,7 @@ __pycache__/
 .venv/
 .pytest_cache/
 .ruff_cache/
+*.db
 
 # Configurations locales et secrets (versionner seulement les *.example)
 *.local.*

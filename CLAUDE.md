@@ -65,8 +65,15 @@ docs/               vision, architecture, decisions/ (ADR), mesures/, roadmap
 - CI GitHub (`.github/workflows/build-player.yml`) : compile `ptzview` sur
   ubuntu-latest à chaque PR et sur `main`. FFmpeg y est standard (sans `+rpt`) :
   la CI vérifie la compilation, pas le fonctionnement sur le Pi.
-- Python (agent, core) : à définir lors de leur création (pytest, ruff).
-  Mettre à jour cette section dès que les commandes existent.
+- OsmiraCore (`cd osmiracore`, outil `uv`) :
+  - `uv sync` : installe l'environnement et les dépendances figées (`uv.lock`) ;
+  - `uv run pytest` : tests ;
+  - `uv run ruff check` et `uv run ruff format --check` : style (la CI échoue
+    sinon ; `uv run ruff format` corrige la mise en forme) ;
+  - `uv run uvicorn osmiracore.main:app --reload` : serveur de dev sur
+    http://localhost:8000 (doc interactive sur `/docs`).
+  - CI : `.github/workflows/core.yml` (job `test`), à chaque PR et sur `main`.
+- Agent OsmiraCam : à définir lors de sa création (même outillage que le Core).
 
 ## Conventions
 
