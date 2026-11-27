@@ -75,7 +75,10 @@ docs/               vision, architecture, decisions/ (ADR), mesures/, roadmap
   - `uv run uvicorn osmiracore.main:app --reload` : serveur de dev sur
     http://localhost:8000 (doc interactive sur `/docs`).
   - CI : `.github/workflows/core.yml` (job `test`), à chaque PR et sur `main`.
-- Agent OsmiraCam : à définir lors de sa création (même outillage que le Core).
+- Agent OsmiraCam (`cd osmiracam/agent`, outil `uv`) : mêmes commandes que le
+  Core (`uv sync`, `uv run pytest`, `uv run ruff check`, `uv run ruff format`) ;
+  lancement : `uv run osmiracam-agent -c agent.toml` (voir son README).
+  CI : `.github/workflows/agent.yml` (job `agent`).
 
 ## Conventions
 

@@ -26,7 +26,7 @@ affichée depuis le Core. Pas de pilotage PTZ à cette étape.
 - [x] OsmiraCore : `GET /api/stations/{id}/config` versionnée (média seul).
 - [x] OsmiraCore : caméra affichée par sortie (matrice) + flux SSE (`select`,
   `config_changed`).
-- [ ] Agent OsmiraCam minimal : récupère sa config, la garde en local, lance
+- [x] Agent OsmiraCam minimal : récupère sa config, la garde en local, lance
   `ptzview` et le relance quand la config change.
 - [ ] Agent : écoute le SSE et bascule `ptzview`.
 - [ ] Interface web : caméras, stations, droits, matrice de bascule
