@@ -128,6 +128,14 @@ arrivait à ce moment ; vides = en direct), `state`, `fps`, `mbps`, `width`,
 source de statistiques des liaisons directes pour l'instant (les vraies stats
 SRT côté poste demanderont une évolution de `ptzview`).
 
+## StationMetric (mesures système d'un poste)
+
+Une ligne par état reçu (5 s) : CPU, charge, fréquence, température,
+drapeaux d'alimentation/bridage du Pi, RAM, swap, CMA, disque, durée de
+fonctionnement, CPU et mémoire de `ptzview` et de l'agent, réseau par
+interface (JSON). Table à part (sans toucher aux tables existantes), purgée
+avec les autres relevés (7 jours).
+
 ## Prévu, hors incrément 1
 
 - **Site** : `id`, `label`, adresse du MediaMTX, réseau caméras.

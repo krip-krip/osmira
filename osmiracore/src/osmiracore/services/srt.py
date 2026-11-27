@@ -27,7 +27,7 @@ import httpx2
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from osmiracore.models import Camera, MediaServer, SrtSample, StationSample
+from osmiracore.models import Camera, MediaServer, SrtSample, StationMetric, StationSample
 from osmiracore.schemas import ExposedMedia, ExposedPath, MediaServerState, SourceMedia, SrtLink
 
 log = logging.getLogger(__name__)
@@ -208,6 +208,7 @@ class SrtCollector:
                 limit = now - self._retention_s
                 session.execute(delete(SrtSample).where(SrtSample.ts < limit))
                 session.execute(delete(StationSample).where(StationSample.ts < limit))
+                session.execute(delete(StationMetric).where(StationMetric.ts < limit))
                 self._last_purge = now
             session.commit()
 

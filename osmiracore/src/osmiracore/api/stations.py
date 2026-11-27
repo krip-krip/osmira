@@ -1,9 +1,10 @@
 """/api/stations routes: stations, rights, configuration, selection, events."""
 
 from collections.abc import AsyncIterator
+from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, Request, Response, status
+from fastapi import APIRouter, Depends, Header, Query, Request, Response, status
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
@@ -17,12 +18,13 @@ from osmiracore.schemas import (
     SelectionIn,
     StationConfig,
     StationCreate,
+    StationMetricsSeries,
     StationOut,
     StationStatusIn,
     StationStatusOut,
     StationUpdate,
 )
-from osmiracore.services import config, events, selection, stations
+from osmiracore.services import config, events, selection, station_metrics, stations
 from osmiracore.services import status as heartbeat
 
 router = APIRouter(prefix="/api/stations", tags=["stations"])
@@ -137,6 +139,25 @@ def get_status(station_id: str, session: SessionDep, settings: SettingsDep) -> S
     """Online if the last status is recent; config_up_to_date compares versions."""
     station = stations.get_station(session, station_id)
     return heartbeat.station_status(session, station, settings.online_timeout_s)
+
+
+@router.get("/{station_id}/metrics")
+def get_metrics(
+    station_id: str,
+    request: Request,
+    session: SessionDep,
+    since: datetime | None = None,
+    until: datetime | None = None,
+    points: Annotated[int, Query(ge=10, le=5000)] = station_metrics.DEFAULT_POINTS,
+) -> StationMetricsSeries:
+    """System figures of the station over a period (default: since the Core
+    started): CPU, load, frequency, temperature, power flags, memory, CMA,
+    disk, processes, network per interface, and frame rate per camera."""
+    stations.get_station(session, station_id)
+    start = since.timestamp() if since else request.app.state.started_at
+    return station_metrics.series(
+        session, station_id, start, until.timestamp() if until else None, points
+    )
 
 
 # --- events (SSE) -------------------------------------------------------------

@@ -196,6 +196,20 @@ curl -N localhost:8000/api/stations/panelTest/events
   `seconds_since`, `config_up_to_date` (la version appliquée par le poste
   est-elle la version actuelle ?) et le dernier `status` reçu.
 - `GET /api/matrix` : chaque destination porte aussi `online`.
+- L'état contient aussi `metrics` (toutes les 5 s) : `cpu_pct`, `load1`,
+  `cpu_mhz`, `temp_c`, `throttled` (drapeaux du Pi : bit 0 sous-tension, 1
+  fréquence limitée, 2 bridage, 3 limite thermique ; bits 16–19 : depuis le
+  démarrage), `mem_total_mb`, `mem_available_mb`, `swap_used_mb`,
+  `cma_total_mb`, `cma_free_mb`, `disk_used_pct`, `uptime_s`, `net` (par
+  interface : `rx_mbps`, `tx_mbps`, `rx_dropped`, `errors`) et `processes`
+  (`ptzview`, `agent` : `cpu_pct`, `rss_mb`).
+- `GET /api/stations/{id}/metrics?since=&until=&points=` : courbes de ces
+  mesures par tranches (`series` : moyenne, mais minimum pour la RAM et la
+  CMA libres et maximum pour la température ; `under_voltage` / `throttled` à
+  1 si un épisode a eu lieu dans la tranche), `net` par interface, `cameras`
+  (i/s, erreurs de décodage), `latest` (dernières valeurs) et `summary` (CPU
+  et température maximaux, CMA et RAM minimales, durées de sous-tension et de
+  bridage, redémarrages). Par défaut depuis le démarrage du Core.
 
 ### Serveurs média et statistiques SRT (ADR 0010)
 
