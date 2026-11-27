@@ -29,10 +29,11 @@ Core »), relevés `station_samples`, journal du Pi.
   sur cam1–3 : `EID:… no sockets to check, this would deadlock` et
   `lecture : Unknown error occurred` ; les 4 entrées se déconnectent ensemble.
 - Reconnexion de toutes les entrées en 2 à 3 s (cam1–3 à +2,1 s, cam4 à +3,2 s).
-- **Hypothèse** (non vérifiée) : dans `ptzview`, l'interruption d'une entrée
-  bloquée (délai `stall_timeout_ms`) se propage aux autres (rappel
-  d'interruption ou boucle d'attente SRT partagés). Un flux qui cale ne
-  devrait couper que lui-même : à examiner dans `ptzview.c`.
+- **Cause trouvée le 28/11** (l'hypothèse d'un défaut de `ptzview` était
+  fausse) : défaut de libsrt 1.5.4 — la fermeture d'une connexion arrête la
+  bibliothèque pour tout le processus. Contourné dans `ptzview` (ADR 0012) :
+  0 coupure des autres entrées au lieu de 21 en 25 s avec une entrée qui
+  échoue en boucle.
 
 ## Ressources du Pi (353 relevés)
 | | Début | Fin | Min | Max |
@@ -47,6 +48,6 @@ Core »), relevés `station_samples`, journal du Pi.
   reconnexion. À comparer avec `extra_hw_frames` réduit (2 → 1 ou 0).
 
 ## À faire
-- Examiner la propagation de la coupure d'une entrée aux autres dans `ptzview`.
+- ~~Examiner la propagation de la coupure d'une entrée aux autres~~ : corrigé (ADR 0012).
 - Publier les stats SRT côté réception dans `ptzview` (paquets jetés au Pi).
 - Essai CMA avec `extra_hw_frames = 1` puis `0` ; essai latence 40 ms.
