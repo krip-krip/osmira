@@ -1,0 +1,15 @@
+<form class="period" method="get">
+  {% if link_id is defined %}<input type="hidden" name="id" value="{{ link_id }}">{% endif %}
+  <div class="segmented" role="radiogroup" aria-label="period">
+    {% for key, label in periods.items() if key != "custom" %}
+      <label class="seg"><input type="radio" name="period" value="{{ key }}" onchange="this.form.submit()" {% if period.key == key %}checked{% endif %}>{{ label }}</label>
+    {% endfor %}
+    <label class="seg"><input type="radio" name="period" value="custom" {% if period.key == "custom" %}checked{% endif %}>Custom</label>
+  </div>
+  <span class="custom-dates">
+    <input type="datetime-local" name="since" value="{{ period.since_text }}" aria-label="from">
+    →
+    <input type="datetime-local" name="until" value="{{ period.until_text }}" aria-label="to">
+    <button type="submit" onclick="this.form.period.value='custom'">Show</button>
+  </span>
+</form>

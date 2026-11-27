@@ -38,7 +38,10 @@ affichée depuis le Core. Pas de pilotage PTZ à cette étape.
   postes ; codec via MediaMTX avec les stats SRT).
 - [x] Stats SRT : collecte dans MediaMTX (2 liaisons par image), postes
   reconnus par leur streamid, codec des caméras (ADR 0010).
-- [ ] Stats SRT : page Liaisons (courbes uPlot, sessions de mesure, export CSV).
+- [x] Historique des liaisons (paires de bouts, liaisons directes par les
+  relevés des postes) et page Links (période, tableau, courbes uPlot).
+- [ ] Sessions de mesure (protégées de la purge) et export CSV.
+- [ ] `ptzview` : publier les stats SRT côté réception (liaisons directes).
 - [ ] `ptzview` : nombre de caméras configurable, rechargement de la config
   sans redémarrage.
 - [ ] Tally/UMD par SSE.

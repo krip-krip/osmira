@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Link{% endblock %}
+{% block head %}
+  {# uPlot 1.6.31, served locally. #}
+  <link rel="stylesheet" href="/static/uPlot.min.css">
+  <script src="/static/uPlot.iife.min.js" defer></script>
+  <script src="/static/links.js" defer></script>
+{% endblock %}
+{% block content %}
+{%- macro cam(id) -%}{{ names.camera.get(id, id) if id else "unknown camera" }}{%- endmacro -%}
+{%- macro srv(id) -%}{{ names.server.get(id, id) }}{%- endmacro -%}
+<p class="crumbs"><a href="/links?{{ period.query }}">Links</a> /</p>
+{% if not link %}
+  <h1>Link not found</h1>
+  <p class="empty">No sample of <code>{{ link_id }}</code> in this period.</p>
+  {% include "_period.html" %}
+{% else %}
+{% set x = link %}
+<h1>
+  {% if x.kind == "camera_server" %}{{ cam(x.camera_id) }} → {{ srv(x.server_id) }}
+  {% elif x.kind == "server_station" %}{{ srv(x.server_id) }} → {{ x.station_id }} <span class="muted">({{ cam(x.camera_id) }})</span>
+  {% else %}{{ cam(x.camera_id) }} → {{ x.station_id }} <span class="badge">direct</span>{% endif %}
+</h1>
+{% include "_period.html" %}
+<div class="cards">
+  <div class="card"><span>State</span><strong>{{ "active" if x.active else "ended" }}</strong><small>{{ x.first_seen[11:19] }} → {{ x.last_seen[11:19] }} UTC</small></div>
+  <div class="card"><span>Duration</span><strong>{{ x.duration_s|duration }}</strong><small>{{ x.connections|num }} connection(s)</small></div>
+  {% if x.packets is not none %}
+  <div class="card {{ 'warn' if x.loss_percent and x.loss_percent > 1 }}"><span>Loss</span><strong>{{ x.loss_percent|num(2) }} %</strong><small>{{ x.packets_lost|num }} of {{ x.packets|num }} packets</small></div>
+  <div class="card"><span>Retransmitted</span><strong>{{ x.packets_retrans|num }}</strong><small>packets</small></div>
+  <div class="card {{ 'bad' if x.packets_dropped }}"><span>Dropped</span><strong>{{ x.packets_dropped|num }}</strong><small>too late to be played</small></div>
+  <div class="card"><span>RTT</span><strong>{{ x.rtt_avg_ms|num }} ms</strong><small>max {{ x.rtt_max_ms|num }} ms</small></div>
+  {% endif %}
+  {% if x.fps_avg is not none %}
+  <div class="card"><span>Frame rate</span><strong>{{ x.fps_avg|num }}</strong><small>min {{ x.fps_min|num }}</small></div>
+  <div class="card {{ 'bad' if x.no_picture_s }}"><span>No picture</span><strong>{{ x.no_picture_s|duration }}</strong><small>at the station</small></div>
+  <div class="card {{ 'warn' if x.decode_errors }}"><span>Decode errors</span><strong>{{ x.decode_errors|num }}</strong><small>{{ x.reconnects|num }} reconnection(s)</small></div>
+  {% endif %}
+</div>
+<div id="charts" data-series="{{ series_url }}" data-kind="{{ x.kind }}" data-live="{{ 'true' if period.until is none else 'false' }}">
+  {% if x.kind != "camera_station" %}
+  <section class="chart"><h2>RTT (ms)</h2><div data-chart="rtt"></div></section>
+  <section class="chart"><h2>Loss (%) and retransmissions (/s)</h2><div data-chart="loss"></div></section>
+  {% endif %}
+  <section class="chart"><h2>Bitrate (Mb/s)</h2><div data-chart="mbps"></div></section>
+  {% if x.kind != "camera_server" %}
+  <section class="chart"><h2>Frame rate at the station and decode errors</h2><div data-chart="fps"></div></section>
+  {% endif %}
+  {% if x.kind != "camera_station" %}
+  <section class="chart"><h2>Dropped packets</h2><div data-chart="dropped"></div></section>
+  {% endif %}
+  <p class="muted small" id="charts-note">Loading the curves…</p>
+</div>
+{% endif %}
+{% endblock %}

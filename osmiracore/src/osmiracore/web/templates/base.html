@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/static/style.css">
   {# htmx 2.0.4, served locally: the interface works without Internet access. #}
   <script src="/static/htmx.min.js" defer></script>
+  {% block head %}{% endblock %}
 </head>
 <body>
   <header class="top">
@@ -16,6 +17,7 @@
       <a href="/cameras" {% if active == "cameras" %}class="active"{% endif %}>Cameras</a>
       <a href="/stations" {% if active == "stations" %}class="active"{% endif %}>Stations</a>
       <a href="/media-servers" {% if active == "media" %}class="active"{% endif %}>Media servers</a>
+      <a href="/links" {% if active == "links" %}class="active"{% endif %}>Links</a>
       <a href="/docs">API</a>
     </nav>
   </header>
