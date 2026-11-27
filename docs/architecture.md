@@ -40,9 +40,9 @@
 - Bascule = changement de tampon au prochain rafraîchissement : 18 à 60 ms mesurés.
 - Reconnexion automatique de chaque entrée (environ toutes les 2 s) ; dernière
   image figée + « NO SIGNAL » en cas de perte.
-- API HTTP locale : `/status`, `/select/N`, `/tally/N/off|pvw|pgm`, `/label/N`.
-- Évolutions prévues : nombre de caméras configurable, rechargement de la
-  configuration sans redémarrage.
+- API HTTP locale : `/status`, `/select/N`, `/tally/N/off|pvw|pgm`, `/label/N`,
+  `/input/N` (nouvelle URL d'une entrée à chaud ; vide = désactivée).
+- Évolution prévue : nombre de caméras configurable.
 
 ### agent OsmiraCam (Python)
 - **Connecteur Core** : récupère la configuration complète (versionnée), l'enregistre
