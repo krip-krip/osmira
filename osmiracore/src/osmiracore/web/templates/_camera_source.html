@@ -28,8 +28,9 @@
         <input name="path" value="{{ form.path }}" list="paths" autocomplete="off" placeholder="cam1"
                pattern="[^\s:?&amp;]{1,200}">
         {% if server %}
+        {#- Own target and include: htmx attributes are inherited from the fieldset. -#}
         <span id="path-options" hx-get="/media-servers/{{ server.id }}/path-options" hx-trigger="load"
-              hx-swap="outerHTML"><small class="muted">reading the paths of {{ server.id }}…</small></span>
+              hx-target="this" hx-include="this" hx-swap="outerHTML"><small class="muted">reading the paths of {{ server.id }}…</small></span>
         {% endif %}
       </label>
     {% endif %}
