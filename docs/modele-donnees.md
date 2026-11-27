@@ -102,6 +102,16 @@ Pas de ligne = aucun choix du Core (le poste affiche sa première caméra
 visible). Effacée si le droit `view` disparaît, si la caméra est supprimée ou
 si la sortie n'existe plus.
 
+## MediaServer (serveur média) et SrtSample — ADR 0010
+
+- **MediaServer** : `id`, `label`, `api_url`, `api_username`, `api_password`
+  (écriture seule), `enabled`.
+- **SrtSample** : un relevé par liaison toutes les 5 s, gardé 7 jours : `ts`,
+  `server_id`, `link` (`camera` | `station`), `path`, `camera_id`, `station_id`,
+  `connection_id`, `remote_addr`, `rtt_ms`, `mbps`, `link_capacity_mbps`,
+  `packets`, `packets_lost`, `packets_retrans`, `packets_dropped`, `buffer_ms`.
+  Pas de clé étrangère : l'historique survit aux caméras et postes supprimés.
+
 ## Prévu, hors incrément 1
 
 - **Site** : `id`, `label`, adresse du MediaMTX, réseau caméras.

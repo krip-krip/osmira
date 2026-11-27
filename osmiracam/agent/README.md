@@ -33,6 +33,11 @@ Core l'affiche (en ligne / hors ligne).
 Identifiant du poste : `station_id` dans `agent.toml`, ou à défaut le
 **hostname** du Pi.
 
+Chaque connexion SRT est signée avec l'identifiant du poste
+(`streamid=read:cam1:::station=panelTest`) : le Core attribue ainsi les
+statistiques SRT lues dans MediaMTX au bon poste, même derrière un relais
+(ADR 0010). Désactivable avec `tag_srt_streamid = false`.
+
 Pas encore : tally/UMD, manette, pilotage PTZ, deuxième sortie HDMI.
 
 ## Limite actuelle de ptzview

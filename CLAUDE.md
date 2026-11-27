@@ -30,8 +30,9 @@ Architecture : @docs/architecture.md
 - Les commandes PTZ vont **directement du Pi à la caméra**. Elles ne passent
   jamais par OsmiraCore.
 - La vidéo va caméras → MediaMTX → Pi. Elle ne passe jamais par OsmiraCore.
-- OsmiraCore sert uniquement à la configuration, aux droits, au tally, à l'UMD
-  et au choix de la caméra affichée par sortie (matrice, ADR 0009). Il peut
+- OsmiraCore sert uniquement à la configuration, aux droits, au tally, à l'UMD,
+  au choix de la caméra affichée par sortie (matrice, ADR 0009) et à la
+  supervision (état des postes, stats SRT lues dans MediaMTX, ADR 0010). Il peut
   être loin (VPS) : rien ne doit **s'arrêter** s'il tombe (image, pilotage,
   bascule locale). Le Core commande, le poste exécute.
 - Si OsmiraCore est injoignable, le Pi continue avec sa dernière configuration

@@ -77,6 +77,9 @@
   au départ).
 - Prise de main / arbitrage entre opérateurs : géré par le Core ; en cas de
   coupure, les derniers droits connus s'appliquent.
+- Supervision : état remonté par chaque poste toutes les 5 s ; statistiques
+  SRT des deux liaisons (caméra → MediaMTX, MediaMTX → poste) lues dans l'API
+  MediaMTX en lecture seule et gardées 7 jours (ADR 0010).
 - SQLite au départ ; déployé en Docker.
 
 ## Communication OsmiraCore ↔ OsmiraCam (voir ADR 0005)

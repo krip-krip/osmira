@@ -29,6 +29,7 @@ Règles :
 | [0007](0007-monorepo-github-flow-ci.md) | Monorepo, GitHub flow, CI dès le départ | Accepté |
 | [0008](0008-pile-osmiracore.md) | Pile technique d'OsmiraCore (uv, SQLAlchemy, Jinja2 + htmx, version par empreinte) | Accepté |
 | [0009](0009-bascule-depuis-le-core.md) | Choix de la caméra affichée depuis le Core (matrice) | Accepté |
+| [0010](0010-stats-srt-depuis-mediamtx.md) | Statistiques SRT lues par le Core dans l'API MediaMTX | Accepté |
 
 ## Modèle
 

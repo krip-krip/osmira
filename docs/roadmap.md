@@ -36,8 +36,9 @@ affichée depuis le Core. Pas de pilotage PTZ à cette étape.
   en ligne / hors ligne dans les pages Stations et Matrice.
 - [x] Paramètres média des caméras en « auto » (format reçu remonté par les
   postes ; codec via MediaMTX avec les stats SRT).
-- [ ] Stats SRT : collecte MediaMTX, page Liaisons (courbes uPlot, sessions
-  de mesure, export CSV).
+- [x] Stats SRT : collecte dans MediaMTX (2 liaisons par image), postes
+  reconnus par leur streamid, codec des caméras (ADR 0010).
+- [ ] Stats SRT : page Liaisons (courbes uPlot, sessions de mesure, export CSV).
 - [ ] `ptzview` : nombre de caméras configurable, rechargement de la config
   sans redémarrage.
 - [ ] Tally/UMD par SSE.
@@ -56,6 +57,8 @@ affichée depuis le Core. Pas de pilotage PTZ à cette étape.
 
 ## Questions ouvertes
 - Origine des pertes SRT toutes les 12 s (VPN, relais `.252`, PC, MediaMTX ?).
+  Premier relevé (2026-11-27) : 0 % caméras → MediaMTX, 7–8,5 % MediaMTX → Pi
+  (via `.252`), rattrapées par les retransmissions (voir `mesures/`).
 - Latence SRT définitive : 20 ou 40 ms ?
 - Débit réel des caméras (~16 Mb/s mesurés vs 12,8 visés).
 - Latence de bout en bout à mesurer sur place.
