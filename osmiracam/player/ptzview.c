@@ -70,8 +70,8 @@ int srt_cleanup(void)
 typedef enum { TALLY_OFF = 0, TALLY_PVW, TALLY_PGM } tally_t;
 static const char *tally_name[] = { "off", "pvw", "pgm" };
 
-typedef enum { ST_CONNECTING = 0, ST_CONNECTED, ST_STREAMING, ST_WAITING } cstate_t;
-static const char *state_name[] = { "connecting", "connected", "streaming", "waiting" };
+typedef enum { ST_CONNECTING = 0, ST_CONNECTED, ST_STREAMING, ST_WAITING, ST_DISABLED } cstate_t;
+static const char *state_name[] = { "connecting", "connected", "streaming", "waiting", "disabled" };
 
 struct cam {
     int idx;
@@ -90,6 +90,8 @@ struct cam {
     /* privé au thread de la caméra */
     pthread_t th;
     volatile int64_t deadline_us;
+    /* set by POST /input/N: drop the current connection and use the new URL */
+    volatile int reload;
     char prev_err[160];
     int64_t prev_err_log_us;
 };
@@ -393,7 +395,7 @@ static int load_config(const char *path)
 static int interrupt_cb(void *opaque)
 {
     struct cam *c = opaque;
-    if (g.quit)
+    if (g.quit || c->reload)
         return 1;
     return c->deadline_us && now_us() > c->deadline_us;
 }
@@ -480,6 +482,14 @@ static void publish_frame(struct cam *c, AVFrame *frm)
     pthread_mutex_unlock(&g.lock);
 }
 
+/* Sleep up to ms, waking up early to quit or to apply a new URL. */
+static void cam_wait(struct cam *c, int ms)
+{
+    int64_t end = now_us() + (int64_t)ms * 1000;
+    while (!g.quit && !c->reload && now_us() < end)
+        usleep(20000);
+}
+
 static void *cam_thread(void *arg)
 {
     struct cam *c = arg;
@@ -494,13 +504,27 @@ static void *cam_thread(void *arg)
     bool first = true, warned_fmt = false;
 
     while (!g.quit) {
-        if (!first) {
+        if (!first && !c->reload) {
             cam_set_state(c, ST_WAITING);
-            sleep_ms(g.cfg.reconnect_ms);
+            cam_wait(c, g.cfg.reconnect_ms);
             if (g.quit)
                 break;
         }
         first = false;
+
+        /* Take the URL (it can change at any time through POST /input/N). */
+        char url[sizeof c->url];
+        pthread_mutex_lock(&g.lock);
+        snprintf(url, sizeof url, "%s", c->url);
+        c->reload = 0;
+        pthread_mutex_unlock(&g.lock);
+        if (!url[0]) {
+            /* No URL: input disabled, no connection attempt until one is given. */
+            cam_set_state(c, ST_DISABLED);
+            while (!g.quit && !c->reload)
+                usleep(50000);
+            continue;
+        }
         cam_set_state(c, ST_CONNECTING);
 
         AVFormatContext *fmt = avformat_alloc_context();
@@ -518,10 +542,11 @@ static void *cam_thread(void *arg)
         av_dict_set(&opt, "transtype", "live", 0);
 
         c->deadline_us = now_us() + (int64_t)(g.cfg.connect_timeout_ms + 2000) * 1000;
-        r = avformat_open_input(&fmt, c->url, ts, &opt);
+        r = avformat_open_input(&fmt, url, ts, &opt);
         av_dict_free(&opt);
         if (r < 0) {
-            cam_error(c, "connexion", r);
+            if (!c->reload)
+                cam_error(c, "connexion", r);
             continue;
         }
         pthread_mutex_lock(&g.lock);
@@ -529,7 +554,7 @@ static void *cam_thread(void *arg)
         c->connects++;
         pthread_cond_broadcast(&g.cond);
         pthread_mutex_unlock(&g.lock);
-        logm("cam%d : connecté (%s)", c->idx + 1, c->url);
+        logm("cam%d : connecté (%s)", c->idx + 1, url);
         c->prev_err[0] = 0;
 
         int64_t win_start = now_us();
@@ -540,7 +565,8 @@ static void *cam_thread(void *arg)
             c->deadline_us = now_us() + (int64_t)g.cfg.stall_timeout_ms * 1000;
             r = av_read_frame(fmt, pkt);
             if (r < 0) {
-                cam_error(c, r == AVERROR_EXIT ? "plus de données (timeout)" : "lecture", r);
+                if (!c->reload)
+                    cam_error(c, r == AVERROR_EXIT ? "plus de données (timeout)" : "lecture", r);
                 break;
             }
             if (vidx < 0) {
@@ -617,7 +643,9 @@ static void *cam_thread(void *arg)
         }
         avcodec_free_context(&dec);
         avformat_close_input(&fmt);
-        if (!g.quit)
+        if (c->reload)
+            logm("cam%d : nouvelle URL, reconnexion", c->idx + 1);
+        else if (!g.quit)
             logm("cam%d : déconnecté, nouvel essai dans %d ms", c->idx + 1, g.cfg.reconnect_ms);
     }
     av_packet_free(&pkt);
@@ -1422,7 +1450,9 @@ static char *status_json(void)
         struct cam *c = &g.cam[i];
         bool sig = c->state == ST_STREAMING &&
                    t - c->last_frame_us < (int64_t)g.cfg.stall_timeout_ms * 1000;
-        sb_printf(&s, "%s{\"cam\":%d,\"label\":", i ? "," : "", i + 1);
+        sb_printf(&s, "%s{\"cam\":%d,\"url\":", i ? "," : "", i + 1);
+        sb_json_str(&s, c->url);
+        sb_printf(&s, ",\"label\":");
         sb_json_str(&s, c->label);
         sb_printf(&s, ",\"tally\":\"%s\",\"state\":\"%s\",\"connected\":%s,\"signal\":%s,"
                       "\"fps\":%.1f,\"mbps\":%.2f,\"width\":%d,\"height\":%d,"
@@ -1549,7 +1579,33 @@ static enum MHD_Result http_cb(void *cls, struct MHD_Connection *conn, const cha
         return reply(conn, 200, status_json());
     }
 
-    return reply(conn, 404, error_json("routes : /status /select/N /tally/N/off|pvw|pgm /label/N"));
+    if (sscanf(url, "/input/%d%n", &n, &len) == 1 && !url[len]) {
+        /* New SRT URL for one input, applied without disturbing the others;
+           an empty URL disables the input. GET ?url=... or body url=... */
+        if (n < 1 || n > NCAM)
+            return reply(conn, 400, error_json("caméra 1 à 4"));
+        char newurl[sizeof g.cam[0].url];
+        const char *q = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "url");
+        if (q)
+            snprintf(newurl, sizeof newurl, "%s", q);
+        else if (!strncmp(rq->body, "url=", 4)) {
+            snprintf(newurl, sizeof newurl, "%s", rq->body + 4);
+            url_decode_form(newurl);
+        } else
+            return reply(conn, 400, error_json("url manquante (?url=... ou corps url=...)"));
+        struct cam *c = &g.cam[n - 1];
+        pthread_mutex_lock(&g.lock);
+        if (strcmp(c->url, newurl)) {
+            snprintf(c->url, sizeof c->url, "%s", newurl);
+            c->reload = 1;
+            logm("cam%d : URL changée (%s)", n, newurl[0] ? newurl : "entrée désactivée");
+        }
+        pthread_cond_broadcast(&g.cond);
+        pthread_mutex_unlock(&g.lock);
+        return reply(conn, 200, status_json());
+    }
+
+    return reply(conn, 404, error_json("routes : /status /select/N /tally/N/off|pvw|pgm /label/N /input/N"));
 }
 
 static void http_done(void *cls, struct MHD_Connection *c, void **con_cls,

@@ -40,11 +40,20 @@ statistiques SRT lues dans MediaMTX au bon poste, même derrière un relais
 
 Pas encore : tally/UMD, manette, pilotage PTZ, deuxième sortie HDMI.
 
+## Changements de configuration sans coupure
+
+Chaque caméra garde son entrée de `ptzview` (`state/slots.json`) : une caméra
+retirée libère la sienne (désactivée, aucune tentative de connexion), une
+nouvelle prend une entrée libre. À un changement de configuration, l'agent
+ne met à jour que les entrées modifiées (`/input/N`, `/label/N`) : l'image à
+l'écran n'est pas coupée. `ptzview` n'est relancé que si un réglage global
+change (latence SRT, réglages `[ptzview.general]`).
+
 ## Limite actuelle de ptzview
 
 `ptzview` a 4 entrées fixes. Les caméras de la configuration les remplissent
-dans l'ordre des `position` ; au-delà de 4, elles sont ignorées (message dans
-le journal) ; les entrées libres affichent NO SIGNAL.
+dans l'ordre des `position` puis gardent leur entrée ; au-delà de 4, elles
+sont ignorées (message dans le journal) ; les entrées libres affichent NO SIGNAL.
 
 ## Installation sur le Pi (une fois)
 

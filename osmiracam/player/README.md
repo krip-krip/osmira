@@ -68,8 +68,18 @@ curl --data 'PLATEAU LARGE' $P/label/2              # texte de la caméra 2
 curl -G --data-urlencode 'text=CAM 3 été' $P/label/3  # variante (accents, espaces)
 ```
 
-`/status` contient, par caméra : `state` (connecting / connected / streaming /
-waiting), `signal`, `fps`, `mbps`, `connects` (nombre de connexions réussies),
+Changer une entrée à chaud (sans toucher aux autres ni à l'image à l'écran) :
+
+```
+curl --data-urlencode 'url=srt://192.168.104.253:8890?mode=caller&streamid=read:cam5' $P/input/3
+curl --data 'url=' $P/input/3          # URL vide : entrée désactivée (aucune connexion)
+```
+
+Une entrée sans URL (`url =` vide dans la configuration) est désactivée :
+état `disabled`, NO SIGNAL si elle est affichée.
+
+`/status` contient, par caméra : `url`, `state` (connecting / connected / streaming /
+waiting / disabled), `signal`, `fps`, `mbps`, `connects` (nombre de connexions réussies),
 `decode_errors`, `last_error` ; plus `last_switch_ms` et un bloc `system`
 (RAM, swap, CMA libre, température).
 

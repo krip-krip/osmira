@@ -23,7 +23,7 @@ from osmiracam_agent import __version__, ptzview_conf, station_info
 from osmiracam_agent.core_client import CoreClient, CoreEvent, CoreUnavailable
 from osmiracam_agent.ptzview_client import PtzviewClient, PtzviewUnavailable
 from osmiracam_agent.settings import Settings
-from osmiracam_agent.station_config import ConfigStore, SelectionStore, StationConfig
+from osmiracam_agent.station_config import ConfigStore, SelectionStore, SlotsStore, StationConfig
 from osmiracam_agent.supervisor import Supervisor
 
 log = logging.getLogger(__name__)
@@ -61,11 +61,15 @@ class Agent:
         self.selected: str | None = None
         # Last ptzview input successfully switched to (for logs and tests).
         self.shown_slot: int | None = None
+        # Camera id in each ptzview input (stable across configuration changes).
+        self.assignment: list[str | None] | None = None
+        self._slots_store = SlotsStore(settings.state_dir)
 
     # --- start and configuration ----------------------------------------------
 
     async def start(self) -> None:
         self.selected = self._selection_store.load()
+        self.assignment = self._slots_store.load()
         stored = self._store.load()
         if stored is None:
             log.info("no local configuration yet: waiting for the Core")
@@ -106,15 +110,39 @@ class Agent:
                 ptz.slots,
                 ptz.slots,
             )
-        text = ptzview_conf.render(
-            config, ptz, self.selected, tag_station=self._settings.tag_srt_streamid
-        )
-        _write_atomic(ptz.conf_path, text)
-        self.config = config
-        if self._supervisor.running:
-            await self._supervisor.restart()
-        else:
+        tag = self._settings.tag_srt_streamid
+        old_config, old_assignment = self.config, self.assignment
+        assignment = ptzview_conf.assign_slots(config, ptz.slots, old_assignment)
+        text = ptzview_conf.render(config, ptz, self.selected, tag, assignment)
+        _write_atomic(ptz.conf_path, text)  # for the next start of ptzview
+        self.config, self.assignment = config, assignment
+        self._slots_store.save(assignment)
+
+        if not self._supervisor.running:
             self._supervisor.start()
+            return
+        if old_config is None or ptzview_conf.general(
+            old_config, ptz, old_assignment
+        ) != ptzview_conf.general(config, ptz, assignment):
+            log.info("ptzview settings changed: restarting it")
+            await self._supervisor.restart()
+            return
+        # Only the inputs that changed, without disturbing the picture on screen.
+        before = ptzview_conf.slot_inputs(old_config, ptz.slots, old_assignment, tag)
+        after = ptzview_conf.slot_inputs(config, ptz.slots, assignment, tag)
+        try:
+            for slot, (old, new) in enumerate(zip(before, after, strict=True), start=1):
+                if new[0] != old[0]:
+                    await self._ptzview.set_input(slot, new[0])
+                    log.info("input %d: %s", slot, new[0] or "disabled")
+                if new[1] != old[1]:
+                    await self._ptzview.set_label(slot, new[1])
+        except PtzviewUnavailable as exc:
+            log.warning("cannot update ptzview inputs live (%s): restarting it", exc)
+            await self._supervisor.restart()
+            return
+        # The shown camera may have left: show the camera chosen by the Core again.
+        await self.select(self.selected)
 
     # --- selection --------------------------------------------------------------
 
@@ -125,11 +153,9 @@ class Agent:
             self._selection_store.save(camera_id)
         if self.config is None:
             return  # applied as start_camera once a configuration arrives
-        slot = ptzview_conf.display_slot(self.config, self._settings.ptzview.slots, camera_id)
-        if camera_id is not None and not any(
-            c.id == camera_id
-            for c in ptzview_conf.slot_cameras(self.config, self._settings.ptzview.slots)
-        ):
+        slots = self._settings.ptzview.slots
+        slot = ptzview_conf.display_slot(self.config, slots, camera_id, self.assignment)
+        if camera_id is not None and camera_id not in (self.assignment or []):
             log.warning(
                 "camera '%s' is not among the ptzview inputs: showing input %d", camera_id, slot
             )
@@ -205,7 +231,9 @@ class Agent:
             with contextlib.suppress(PtzviewUnavailable):
                 ptz_status = await self._ptzview.status()
         if ptz_status is not None and self.config is not None:
-            slots = ptzview_conf.slot_cameras(self.config, self._settings.ptzview.slots)
+            slots = ptzview_conf.slot_cameras(
+                self.config, self._settings.ptzview.slots, self.assignment
+            )
             for entry in ptz_status.get("cameras", []):
                 index = int(entry.get("cam", 0)) - 1
                 camera = slots[index] if 0 <= index < len(slots) else None

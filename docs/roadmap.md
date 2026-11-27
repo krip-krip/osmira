@@ -42,8 +42,9 @@ affichée depuis le Core. Pas de pilotage PTZ à cette étape.
   relevés des postes) et page Links (période, tableau, courbes uPlot).
 - [ ] Sessions de mesure (protégées de la purge) et export CSV.
 - [ ] `ptzview` : publier les stats SRT côté réception (liaisons directes).
-- [ ] `ptzview` : nombre de caméras configurable, rechargement de la config
-  sans redémarrage.
+- [x] `ptzview` : changement d'une entrée à chaud (`/input/N`), entrées
+  désactivées ; l'agent ne touche que les entrées modifiées.
+- [ ] `ptzview` : nombre de caméras configurable.
 - [ ] Tally/UMD par SSE.
 
 ## Étape 4 — Pilotage PTZ (plus tard ; prévu dans le modèle)
