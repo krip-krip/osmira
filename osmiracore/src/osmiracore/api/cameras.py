@@ -1,17 +1,12 @@
 """/api/cameras routes."""
 
-from typing import Annotated
+from fastapi import APIRouter, status
 
-from fastapi import APIRouter, Depends, status
-from sqlalchemy.orm import Session
-
-from osmiracore.db import get_session
+from osmiracore.api.deps import SessionDep
 from osmiracore.schemas import CameraCreate, CameraOut, CameraUpdate
 from osmiracore.services import cameras
 
 router = APIRouter(prefix="/api/cameras", tags=["cameras"])
-
-SessionDep = Annotated[Session, Depends(get_session)]
 
 
 @router.get("")
@@ -36,4 +31,5 @@ def update_camera(camera_id: str, data: CameraUpdate, session: SessionDep) -> Ca
 
 @router.delete("/{camera_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_camera(camera_id: str, session: SessionDep) -> None:
+    """Delete a camera; station rights on it go with it."""
     cameras.delete_camera(session, camera_id)

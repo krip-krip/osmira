@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from sqlalchemy import JSON, String
+from sqlalchemy import JSON, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from osmiracore.db import Base
@@ -29,3 +29,33 @@ class Camera(Base):
     control_username: Mapped[str | None]
     control_password: Mapped[str | None]
     control_options: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
+class Station(Base):
+    """An OsmiraCam station (one Raspberry Pi), called "poste" in the docs."""
+
+    __tablename__ = "stations"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    label: Mapped[str]
+    # Streams the station can decode permanently (ADR 0002).
+    max_decoders: Mapped[int]
+
+
+class Right(Base):
+    """What a station may do with a camera. No row means no right."""
+
+    __tablename__ = "rights"
+    __table_args__ = (UniqueConstraint("station_id", "position"),)
+
+    station_id: Mapped[str] = mapped_column(
+        ForeignKey("stations.id", ondelete="CASCADE"), primary_key=True
+    )
+    camera_id: Mapped[str] = mapped_column(
+        ForeignKey("cameras.id", ondelete="CASCADE"), primary_key=True
+    )
+    # Camera order on the station (cam1..camN in ptzview).
+    position: Mapped[int]
+    decode: Mapped[bool]
+    view: Mapped[bool]
+    control: Mapped[bool]
