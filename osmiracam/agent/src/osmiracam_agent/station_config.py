@@ -73,3 +73,27 @@ class ConfigStore:
         tmp = self.path.with_suffix(".tmp")
         tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False))
         os.replace(tmp, self.path)
+
+
+class SelectionStore:
+    """Keeps the camera last chosen by the Core, to show it again after a
+    restart even if the Core is unreachable."""
+
+    def __init__(self, state_dir: Path) -> None:
+        self.path = state_dir / "selection.json"
+
+    def load(self) -> str | None:
+        try:
+            camera_id = json.loads(self.path.read_text()).get("camera_id")
+        except FileNotFoundError:
+            return None
+        except (ValueError, AttributeError) as exc:
+            log.warning("ignoring unreadable stored selection %s: %s", self.path, exc)
+            return None
+        return camera_id if isinstance(camera_id, str) else None
+
+    def save(self, camera_id: str | None) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.path.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"camera_id": camera_id}))
+        os.replace(tmp, self.path)

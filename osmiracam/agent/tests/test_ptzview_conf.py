@@ -1,6 +1,6 @@
 from conftest import core_config
 
-from osmiracam_agent.ptzview_conf import UNUSED_SLOT_URL, render, slot_cameras
+from osmiracam_agent.ptzview_conf import UNUSED_SLOT_URL, display_slot, render, slot_cameras
 from osmiracam_agent.station_config import StationConfig
 
 
@@ -83,3 +83,23 @@ def test_newline_in_label_cannot_break_the_file(settings):
 
     assert conf["general"]["http_port"] == "8081"
     assert conf["cam1"]["label"].startswith("PLATEAU")
+
+
+def test_display_slot(settings):
+    config = StationConfig.from_json(
+        core_config([("cam1", 1, False), ("cam2", 2, True), ("cam3", 3, True)])
+    )
+
+    assert display_slot(config, 4, "cam3") == 3
+    assert display_slot(config, 4, "cam1") == 2  # not viewable: first viewable
+    assert display_slot(config, 4, "gone") == 2
+    assert display_slot(config, 4, None) == 2
+    assert display_slot(StationConfig.from_json(core_config([])), 4, None) == 1
+
+
+def test_start_on_the_selected_camera(settings):
+    config = StationConfig.from_json(core_config([("cam1", 1, True), ("cam2", 2, True)]))
+
+    general = parse(render(config, settings.ptzview, selected="cam2"))["general"]
+
+    assert general["start_camera"] == "2"

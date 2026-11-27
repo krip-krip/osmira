@@ -14,6 +14,8 @@ class PtzviewSettings:
     slots: int = 4
     stop_timeout_s: float = 5.0
     restart_delay_s: float = 2.0
+    # How long to keep retrying a switch while ptzview is (re)starting.
+    select_retry_s: float = 10.0
     # Extra keys copied as-is into the [general] section of ptzview.conf.
     general: dict[str, str] = field(default_factory=dict)
 
@@ -27,6 +29,8 @@ class Settings:
     ptzview: PtzviewSettings
     poll_interval_s: float = 10.0
     request_timeout_s: float = 5.0
+    # Pause before reopening the event stream after it broke.
+    events_retry_s: float = 2.0
 
 
 def load_settings(path: Path) -> Settings:
@@ -46,6 +50,7 @@ def load_settings(path: Path) -> Settings:
         slots=int(pv.get("slots", 4)),
         stop_timeout_s=float(pv.get("stop_timeout_s", 5.0)),
         restart_delay_s=float(pv.get("restart_delay_s", 2.0)),
+        select_retry_s=float(pv.get("select_retry_s", 10.0)),
         general={k: str(v) for k, v in pv.get("general", {}).items()},
     )
     return Settings(
@@ -55,4 +60,5 @@ def load_settings(path: Path) -> Settings:
         ptzview=ptzview,
         poll_interval_s=float(data.get("poll_interval_s", 10.0)),
         request_timeout_s=float(data.get("request_timeout_s", 5.0)),
+        events_retry_s=float(data.get("events_retry_s", 2.0)),
     )

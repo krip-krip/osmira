@@ -28,7 +28,7 @@ affichée depuis le Core. Pas de pilotage PTZ à cette étape.
   `config_changed`).
 - [x] Agent OsmiraCam minimal : récupère sa config, la garde en local, lance
   `ptzview` et le relance quand la config change.
-- [ ] Agent : écoute le SSE et bascule `ptzview`.
+- [x] Agent : écoute le SSE et bascule `ptzview`.
 - [ ] Interface web : caméras, stations, droits, matrice de bascule
   (sources en colonnes, sorties des stations en lignes).
 - [ ] `ptzview` : nombre de caméras configurable, rechargement de la config
