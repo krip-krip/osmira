@@ -97,3 +97,29 @@ class SelectionStore:
         tmp = self.path.with_suffix(".tmp")
         tmp.write_text(json.dumps({"camera_id": camera_id}))
         os.replace(tmp, self.path)
+
+
+class SlotsStore:
+    """Keeps which camera is in which ptzview input, so that a restart of the
+    agent does not move the cameras around."""
+
+    def __init__(self, state_dir: Path) -> None:
+        self.path = state_dir / "slots.json"
+
+    def load(self) -> list[str | None] | None:
+        try:
+            data = json.loads(self.path.read_text())
+        except FileNotFoundError:
+            return None
+        except ValueError as exc:
+            log.warning("ignoring unreadable stored slots %s: %s", self.path, exc)
+            return None
+        if isinstance(data, list) and all(x is None or isinstance(x, str) for x in data):
+            return data
+        return None
+
+    def save(self, assignment: list[str | None]) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(assignment))
+        os.replace(tmp, self.path)

@@ -3,6 +3,7 @@ fake ptzview process."""
 
 import asyncio
 import json
+from urllib.parse import parse_qsl
 
 import httpx2
 import pytest
@@ -71,14 +72,27 @@ class FakePtzview:
 
     def __init__(self) -> None:
         self.selects: list[int] = []
+        self.inputs: list[tuple[int, str]] = []  # (slot, url) set live
+        self.labels: list[tuple[int, str]] = []
         self.down = False
+        self.old_version = False  # ptzview without /input
 
     def handler(self, request: httpx2.Request) -> httpx2.Response:
         if self.down:
             raise httpx2.ConnectError("connection refused")
-        if request.url.path == "/status":
+        path = request.url.path
+        if path == "/status":
             return httpx2.Response(200, json=PTZVIEW_STATUS)
-        self.selects.append(int(request.url.path.rsplit("/", 1)[1]))
+        slot = int(path.rsplit("/", 1)[1])
+        form = dict(parse_qsl(request.content.decode(), keep_blank_values=True))
+        if path.startswith("/input/"):
+            if self.old_version:
+                return httpx2.Response(404, json={"ok": False})
+            self.inputs.append((slot, form["url"]))
+        elif path.startswith("/label/"):
+            self.labels.append((slot, form["text"]))
+        else:
+            self.selects.append(slot)
         return httpx2.Response(200, json={})
 
 
@@ -169,19 +183,96 @@ async def test_unchanged_config_does_not_restart(settings):
     assert len(spawner.processes) == 1
 
 
-async def test_new_config_rewrites_conf_and_restarts(settings):
+async def test_new_camera_only_touches_its_input(settings):
     core = FakeCore(core_config([("cam1", 1, True)]))
-    spawner = FakeSpawner()
-    agent = make_agent(settings, core, spawner)
+    spawner, ptzview = FakeSpawner(), FakePtzview()
+    agent = make_agent(settings, core, spawner, ptzview)
     await agent.refresh()
     await until(lambda: len(spawner.processes) == 1)
 
     core.config = core_config(TWO_CAMS, version="sha256:v2")
     assert await agent.refresh() is True
 
+    await asyncio.sleep(0.05)
+    assert len(spawner.processes) == 1  # no restart: the picture is not cut
+    assert ptzview.inputs == [(2, settings_url("cam2"))]
+    assert ptzview.labels == [(2, "CAM2")]
+    assert "read:cam2" in settings.ptzview.conf_path.read_text()  # for the next start
+
+
+def settings_url(camera_id: str) -> str:
+    return f"srt://192.168.104.253:8890?mode=caller&streamid=read:{camera_id}:::station=panelTest"
+
+
+async def test_removed_camera_disables_its_input_only(settings):
+    four = [("cam1", 1, True), ("cam2", 2, True), ("cam3", 3, True), ("cam4", 4, True)]
+    core = FakeCore(core_config(four))
+    spawner, ptzview = FakeSpawner(), FakePtzview()
+    agent = make_agent(settings, core, spawner, ptzview)
+    await agent.refresh()
+    await until(lambda: len(spawner.processes) == 1)
+
+    core.config = core_config([c for c in four if c[0] != "cam3"], version="sha256:v2")
+    await agent.refresh()
+
+    assert ptzview.inputs == [(3, "")]  # cam4 stays in input 4
+    assert agent.assignment == ["cam1", "cam2", None, "cam4"]
+    assert len(spawner.processes) == 1
+
+
+async def test_new_camera_takes_the_free_input(settings):
+    core = FakeCore(core_config([("cam1", 1, True), ("cam4", 4, True)]))
+    agent = make_agent(settings, core, FakeSpawner(), FakePtzview())
+    await agent.refresh()
+
+    core.config = core_config(
+        [("cam1", 1, True), ("cam5", 2, True), ("cam4", 4, True)], "sha256:v2"
+    )
+    await agent.refresh()
+
+    assert agent.assignment == ["cam1", "cam4", "cam5", None]
+
+
+async def test_latency_change_restarts_ptzview(settings):
+    core = FakeCore(core_config(TWO_CAMS))
+    spawner = FakeSpawner()
+    agent = make_agent(settings, core, spawner, FakePtzview())
+    await agent.refresh()
+    await until(lambda: len(spawner.processes) == 1)
+
+    data = core_config(TWO_CAMS, version="sha256:v2")
+    data["cameras"][0]["media"]["latency_ms"] = 40
+    core.config = data
+    await agent.refresh()
+
     await until(lambda: len(spawner.processes) == 2)
-    assert spawner.processes[0].returncode is not None  # old ptzview stopped
-    assert "read:cam2" in settings.ptzview.conf_path.read_text()
+
+
+async def test_old_ptzview_without_input_route_is_restarted(settings):
+    core = FakeCore(core_config([("cam1", 1, True)]))
+    spawner, ptzview = FakeSpawner(), FakePtzview()
+    ptzview.old_version = True
+    agent = make_agent(settings, core, spawner, ptzview)
+    await agent.refresh()
+    await until(lambda: len(spawner.processes) == 1)
+
+    core.config = core_config(TWO_CAMS, version="sha256:v2")
+    await agent.refresh()
+
+    await until(lambda: len(spawner.processes) == 2)
+
+
+async def test_inputs_survive_an_agent_restart(settings):
+    core = FakeCore(core_config([("cam1", 1, True), ("cam4", 4, True)]))
+    first = make_agent(settings, core, FakeSpawner(), FakePtzview())
+    await first.refresh()
+    core.config = core_config([("cam4", 4, True)], "sha256:v2")
+    await first.refresh()
+
+    second = make_agent(settings, FakeCore(None), FakeSpawner(), FakePtzview())
+    await second.start()
+
+    assert second.assignment == [None, "cam4", None, None]
 
 
 async def test_core_down_at_boot_uses_local_copies(settings):
@@ -289,9 +380,10 @@ async def test_latest_select_wins(settings):
     assert ptzview.selects == [1]
 
 
-async def test_new_config_restarts_on_the_selected_camera(settings):
+async def test_new_config_keeps_the_selected_camera(settings):
     core = FakeCore(core_config(TWO_CAMS))
-    agent = make_agent(settings, core, FakeSpawner())
+    ptzview = FakePtzview()
+    agent = make_agent(settings, core, FakeSpawner(), ptzview)
     await agent.refresh()
     await agent.on_event(CoreEvent("select", {"output": 1, "camera_id": "cam2"}))
 
@@ -299,7 +391,9 @@ async def test_new_config_restarts_on_the_selected_camera(settings):
     await agent.on_event(CoreEvent("config_changed", {"version": "sha256:v2"}))
 
     assert agent.config.version == "sha256:v2"
-    assert start_camera(settings) == "3"  # cam2 is now in input 3
+    assert agent.assignment[:3] == ["cam1", "cam2", "cam3"]  # cam2 did not move
+    assert start_camera(settings) == "2"
+    await until(lambda: ptzview.selects[-1:] == [2])
 
 
 async def test_state_event_syncs_config_and_selection(settings):
