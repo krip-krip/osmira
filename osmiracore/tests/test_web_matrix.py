@@ -92,3 +92,17 @@ def test_grid_fragment_is_polled(setup):
 
     assert 'hx-trigger="every 2s"' in grid
     assert grid.count('aria-pressed="true"') == 1
+
+
+def test_cameras_are_rows_and_station_outputs_are_columns(setup):
+    page = setup.get("/matrix").text
+    header = page[page.index("<thead>") : page.index("</thead>")]
+    body = page[page.index("<tbody>") : page.index("</tbody>")]
+
+    # Columns: one per station output, headed by the station id (hostname).
+    assert header.count('class="station-id">panelTest<') == 2
+    assert "out 1" in header and "out 2" in header
+    # Rows: one per camera.
+    assert body.count('<th class="source" scope="row">') == 3
+    for camera_id in ("cam1", "cam2", "cam3"):
+        assert f'class="camera-id">{camera_id}<' in body
