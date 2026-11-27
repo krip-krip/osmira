@@ -1,0 +1,31 @@
+# Compilation du moteur vidéo ptzview, avertissements traités comme des erreurs.
+# Ubuntu fournit le FFmpeg standard (sans "+rpt") : on vérifie que le code
+# compile proprement, pas qu'il fonctionne sur le Pi.
+name: build-player
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config \
+            libavformat-dev libavcodec-dev libavutil-dev \
+            libdrm-dev libcairo2-dev libmicrohttpd-dev
+
+      - name: Build ptzview (-Werror)
+        working-directory: osmiracam/player
+        # CFLAGS passé par l'environnement (et non "make CFLAGS=...") pour que
+        # le "+=" du Makefile ajoute encore les flags pkg-config.
+        env:
+          CFLAGS: -O2 -g -Wall -Wextra -Werror
+        run: make

@@ -8,7 +8,8 @@
 ## Étape 1 — Mise en place du dépôt
 - [ ] Dépôt `osmira` sur GitHub, `ptzview` dans `osmiracam/player/`.
 - [ ] Documentation de départ (ce dossier) + `CLAUDE.md`.
-- [ ] Protection de `main`, CI minimale (compilation de `ptzview`).
+- [ ] Protection de `main`.
+- [x] CI minimale (compilation de `ptzview`).
 
 ## Étape 2 — Conception d'OsmiraCore (sans code)
 - [ ] Modèle de données détaillé (`docs/modele-donnees.md`) : site, caméra
