@@ -157,3 +157,36 @@ def link_detail(
 
 def _iso(ts: float) -> str:
     return datetime.fromtimestamp(ts).astimezone().isoformat(timespec="seconds")
+
+
+@router.get("/stations/{station_id}/metrics")
+def station_metrics_page(
+    request: Request,
+    session: SessionDep,
+    station_id: str,
+    period: str = "core",
+    since: str | None = None,
+    until: str | None = None,
+) -> HTMLResponse:
+    """System figures of one station over a period, with curves."""
+    from osmiracore.services import station_metrics
+
+    station = stations.get_station(session, station_id)
+    p = resolve_period(request, period, since, until)
+    data = station_metrics.series(session, station_id, p.since, p.until, points=10)
+    params = {"since": _iso(p.since)}
+    if p.until is not None:
+        params["until"] = _iso(p.until)
+    return TEMPLATES.TemplateResponse(
+        request,
+        "station_metrics.html",
+        {
+            "active": "stations",
+            "station": station,
+            "period": p,
+            "periods": PERIODS,
+            "latest": data.latest,
+            "summary": data.summary,
+            "series_url": f"/api/stations/{station_id}/metrics?" + urlencode(params),
+        },
+    )

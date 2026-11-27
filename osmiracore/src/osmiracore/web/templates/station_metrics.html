@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ station.id }} · metrics{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="/static/uPlot.min.css">
+  <script src="/static/uPlot.iife.min.js" defer></script>
+  <script src="/static/station_metrics.js" defer></script>
+{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="/stations">Stations</a> / <a href="/stations/{{ station.id }}">{{ station.id }}</a> /</p>
+<h1>{{ station.label }} <span class="muted">{{ station.id }}</span>: system</h1>
+{% include "_period.html" %}
+{% set l = latest %}{% set s = summary %}
+{% if not l %}
+  <p class="empty">No system figures in this period. They arrive every 5 s from an agent of version 0.1.0 or later
+    with system metrics; check that the station is online.</p>
+{% else %}
+<div class="cards">
+  <div class="card {{ 'bad' if l.under_voltage_now else ('warn' if l.throttled_now) }}">
+    <span>Power</span>
+    <strong>{% if l.under_voltage_now %}under-voltage{% elif l.throttled_now %}throttled{% elif l.throttled is none %}–{% else %}OK{% endif %}</strong>
+    <small>{% if l.since_boot %}<span class="warn">events since boot</span>{% else %}nothing since boot{% endif %}{% if s.under_voltage_s or s.throttled_s %} · period: {{ s.under_voltage_s|duration }} UV, {{ s.throttled_s|duration }} throttled{% endif %}</small>
+  </div>
+  <div class="card {{ 'bad' if l.temp_c and l.temp_c >= 80 else ('warn' if l.temp_c and l.temp_c >= 70) }}">
+    <span>Temperature</span><strong>{{ l.temp_c|num }} °C</strong><small>max {{ s.temp_max|num }} °C · {{ l.cpu_mhz|num }} MHz</small>
+  </div>
+  <div class="card {{ 'warn' if l.cpu_pct and l.cpu_pct >= 85 }}">
+    <span>CPU</span><strong>{{ l.cpu_pct|num }} %</strong><small>max {{ s.cpu_max|num }} % · load {{ l.load1|num(2) }}</small>
+  </div>
+  <div class="card {{ 'bad' if l.cma_free_mb is not none and l.cma_free_mb < 16 else ('warn' if l.cma_free_mb is not none and l.cma_free_mb < 32) }}">
+    <span>CMA free</span><strong>{{ l.cma_free_mb|num }} MB</strong><small>min {{ s.cma_free_min|num }} of {{ l.cma_total_mb|num }} MB</small>
+  </div>
+  <div class="card"><span>RAM available</span><strong>{{ l.mem_available_mb|num }} MB</strong><small>min {{ s.mem_available_min|num }} of {{ l.mem_total_mb|num }} MB · swap {{ l.swap_used_mb|num }} MB</small></div>
+  <div class="card"><span>ptzview</span><strong>{{ l.ptzview_cpu_pct|num }} %</strong><small>{{ l.ptzview_rss_mb|num }} MB · agent {{ l.agent_rss_mb|num }} MB</small></div>
+  <div class="card {{ 'warn' if l.disk_used_pct and l.disk_used_pct >= 90 }}"><span>Disk</span><strong>{{ l.disk_used_pct|num }} %</strong><small>SD card used</small></div>
+  <div class="card {{ 'warn' if s.reboots }}"><span>Uptime</span><strong>{{ l.uptime_s|duration }}</strong><small>{{ s.reboots }} reboot(s) in the period</small></div>
+</div>
+<p class="muted small">Last figures {{ l.seen[11:19] }} UTC ({{ l.seconds_since|ago }}).</p>
+{% endif %}
+<div id="charts" data-series="{{ series_url }}" data-live="{{ 'true' if period.until is none else 'false' }}">
+  <section class="chart"><h2>CPU (%) and load</h2><div data-chart="cpu"></div></section>
+  <section class="chart"><h2>Temperature (°C) and CPU frequency (MHz)</h2><div data-chart="temp"></div></section>
+  <section class="chart"><h2>Free memory: RAM and CMA (MB, lowest value of each point)</h2><div data-chart="memory"></div></section>
+  <section class="chart"><h2>Power: under-voltage and throttling</h2><div data-chart="power"></div></section>
+  <section class="chart"><h2>Network received (Mb/s) per interface</h2><div data-chart="net"></div></section>
+  <section class="chart"><h2>Frame rate per camera and decode errors</h2><div data-chart="fps"></div></section>
+  <p class="muted small" id="charts-note">Loading the curves…</p>
+</div>
+{% endblock %}
