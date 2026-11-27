@@ -19,13 +19,22 @@
 - [x] Pile technique du Core (ADR 0008).
 - [ ] Maquettes des écrans de l'interface web.
 
-## Étape 3 — Premier incrément de bout en bout
-- [ ] OsmiraCore minimal : caméras + postes + droits, API, interface web simple.
-- [ ] Agent OsmiraCam minimal : récupère sa config, pilote `ptzview`, reçoit
-  tally/UMD par SSE.
-- [ ] `ptzview` : nombre de caméras configurable, rechargement de la config.
+## Étape 3 — Visualisation de bout en bout (priorité)
+But : voir les caméras sur le Pi, choisir celles d'une station et la caméra
+affichée depuis le Core. Pas de pilotage PTZ à cette étape.
+- [x] OsmiraCore : API caméras, stations (postes) et droits.
+- [x] OsmiraCore : `GET /api/stations/{id}/config` versionnée (média seul).
+- [ ] OsmiraCore : caméra affichée par station + flux SSE (`select`,
+  `config_changed`).
+- [ ] Agent OsmiraCam minimal : récupère sa config, la garde en local, lance
+  `ptzview` et le relance quand la config change.
+- [ ] Agent : écoute le SSE et bascule `ptzview`.
+- [ ] Interface web : caméras, stations, droits, boutons de bascule.
+- [ ] `ptzview` : nombre de caméras configurable, rechargement de la config
+  sans redémarrage.
+- [ ] Tally/UMD par SSE.
 
-## Étape 4 — Pilotage PTZ
+## Étape 4 — Pilotage PTZ (plus tard ; prévu dans le modèle)
 - [ ] Interface des pilotes caméras + fausse caméra pour les tests.
 - [ ] Pilote Panasonic (AW-UE150).
 - [ ] Entrée manette PS4 USB (`evdev`) + profils de mappage.
