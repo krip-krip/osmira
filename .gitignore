@@ -1,6 +1,8 @@
 # Compilation C
 osmiracam/player/ptzview
 osmiracam/player/ptzview.conf
+osmiracam/agent/agent.toml
+osmiracam/agent/state/
 *.o
 
 # Python

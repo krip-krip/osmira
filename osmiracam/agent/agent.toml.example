@@ -1,0 +1,40 @@
+# OsmiraCam agent settings. Copy to agent.toml (ignored by git) and adjust.
+# Relative paths are relative to this file's folder.
+
+# Address of OsmiraCore (through NetBird if remote).
+core_url = "http://192.168.104.10:8000"
+# Fixed identifier of this station, as declared in the Core.
+station_id = "panelTest"
+# Local copy of the last configuration (used when the Core is unreachable).
+state_dir = "state"
+# Seconds between two configuration checks.
+poll_interval_s = 10
+request_timeout_s = 5
+
+[ptzview]
+binary = "../player/ptzview"
+conf_path = "state/ptzview.conf"
+# Port 8080 is taken on panelTest (see docs/environnement-de-test.md).
+http_port = 8081
+# Number of ptzview inputs (fixed at 4 in ptzview today).
+slots = 4
+stop_timeout_s = 5
+restart_delay_s = 2
+
+# Copied as-is into [general] of ptzview.conf (see ptzview.conf.example).
+# Do not set srt_latency_ms, http_port or start_camera here: the agent does.
+[ptzview.general]
+connect_timeout_ms = 1500
+stall_timeout_ms = 1000
+reconnect_ms = 2000
+hwaccel = "drm"
+extra_hw_frames = 2
+drm_device = "auto"
+connector = "HDMI-A-1"
+hdmi_mode = "1920x1080@50"
+video_plane = "auto"
+font = "DejaVu Sans"
+umd_off_alpha = 0.30
+stats_interval_s = 10
+rt_priority = 0
+loglevel = "error"
