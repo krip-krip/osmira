@@ -29,8 +29,11 @@ affichée depuis le Core. Pas de pilotage PTZ à cette étape.
 - [x] Agent OsmiraCam minimal : récupère sa config, la garde en local, lance
   `ptzview` et le relance quand la config change.
 - [x] Agent : écoute le SSE et bascule `ptzview`.
-- [ ] Interface web : caméras, stations, droits, matrice de bascule
-  (sources en colonnes, sorties des stations en lignes).
+- [x] Interface web : matrice de bascule (sources en colonnes, sorties des
+  stations en lignes).
+- [ ] Interface web : pages caméras, stations, droits.
+- [ ] Stats SRT : collecte MediaMTX, signal de vie des Pi, page Liaisons
+  (courbes uPlot, sessions de mesure, export CSV).
 - [ ] `ptzview` : nombre de caméras configurable, rechargement de la config
   sans redémarrage.
 - [ ] Tally/UMD par SSE.

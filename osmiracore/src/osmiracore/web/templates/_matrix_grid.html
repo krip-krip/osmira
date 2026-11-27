@@ -1,0 +1,49 @@
+{#- Reloaded every 2 s so that switches made elsewhere (API, gamepad) show up. -#}
+<div id="grid" hx-get="/matrix/grid" hx-trigger="every 2s" hx-swap="outerHTML">
+  {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+  {% if not matrix.sources or not matrix.destinations %}
+    <p class="empty">
+      {% if not matrix.sources %}No camera yet.{% endif %}
+      {% if not matrix.destinations %}No station yet.{% endif %}
+      Create them through the <a href="/docs">API</a> for now.
+    </p>
+  {% else %}
+  <div class="scroll">
+    <table class="matrix">
+      <thead>
+        <tr>
+          <th class="corner">Destination \ Source</th>
+          {% for source in matrix.sources %}
+            <th class="source" title="{{ source.camera_id }}">{{ source.label }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for dest in matrix.destinations %}
+        <tr>
+          <th class="dest" title="{{ dest.station_id }}">
+            {{ dest.station_label }} <span class="output">out {{ dest.output }}</span>
+          </th>
+          {% for source in matrix.sources %}
+            {% set selected = dest.selected == source.camera_id %}
+            <td>
+              {% if source.camera_id in dest.allowed %}
+                <button class="cell{% if selected %} selected{% endif %}"
+                        hx-post="/matrix/select" hx-target="#grid" hx-swap="outerHTML"
+                        hx-vals='{"station_id": "{{ dest.station_id }}", "output": "{{ dest.output }}", "camera_id": "{{ source.camera_id }}"}'
+                        aria-pressed="{{ 'true' if selected else 'false' }}"
+                        title="{{ source.label }} → {{ dest.station_label }} out {{ dest.output }}">
+                  {{ source.label }}
+                </button>
+              {% else %}
+                <span class="cell disabled" title="no view right">–</span>
+              {% endif %}
+            </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>

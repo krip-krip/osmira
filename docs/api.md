@@ -3,6 +3,8 @@
 Une seule API REST sert les postes, l'interface web et les futurs modules
 (ADR 0005). Base : `http://<core>:8000/api`. Corps et réponses en JSON.
 Documentation interactive générée par FastAPI : `http://<core>:8000/docs`.
+Interface d'administration (HTML, mêmes règles que l'API) : `http://<core>:8000/`
+(page Matrice : `/matrix`).
 
 Routes et champs JSON en anglais, comme tout le code (ADR 0008) : un poste
 OsmiraCam s'appelle `station`. Modèle des données : `docs/modele-donnees.md`.
