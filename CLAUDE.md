@@ -57,6 +57,12 @@ docs/               vision, architecture, decisions/ (ADR), mesures/, roadmap
 
 - Moteur vidéo : `cd osmiracam/player && make` (sur le Pi : paquets listés dans
   son README ; doit compiler sans avertissement).
+- Compilation stricte, identique à la CI :
+  `cd osmiracam/player && CFLAGS="-O2 -g -Wall -Wextra -Werror" make`
+  (CFLAGS par l'environnement, pas en argument de `make`).
+- CI GitHub (`.github/workflows/build-player.yml`) : compile `ptzview` sur
+  ubuntu-latest à chaque PR et sur `main`. FFmpeg y est standard (sans `+rpt`) :
+  la CI vérifie la compilation, pas le fonctionnement sur le Pi.
 - Python (agent, core) : à définir lors de leur création (pytest, ruff).
   Mettre à jour cette section dès que les commandes existent.
 
