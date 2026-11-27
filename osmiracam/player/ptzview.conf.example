@@ -1,0 +1,64 @@
+# ptzview — configuration
+# Format : cle = valeur. Les lignes commencant par # sont des commentaires
+# (pas de commentaire en fin de ligne).
+
+[general]
+# Latence SRT demandee, en MILLIsecondes (convertie en interne pour FFmpeg).
+# La latence effective = max(cette valeur, srtMinLatency de MediaMTX).
+srt_latency_ms = 20
+# Delai max de connexion SRT (ms)
+connect_timeout_ms = 1500
+# Sans donnees pendant ce delai (ms) : NO SIGNAL puis reconnexion
+stall_timeout_ms = 1000
+# Pause entre deux tentatives de reconnexion (ms)
+reconnect_ms = 2000
+
+# Decodage materiel HEVC (FFmpeg +rpt)
+hwaccel = drm
+hwaccel_device =
+# Images supplementaires par decodeur (memoire CMA : ~3 Mo chacune)
+extra_hw_frames = 2
+
+# Sortie HDMI. drm_device = auto ou /dev/dri/card0
+drm_device = auto
+connector = HDMI-A-1
+# WxH@Hz, numero de mode, ou auto. 50 Hz conseille en 25p comme en 50p.
+hdmi_mode = 1920x1080@50
+# Plan video : auto (primaire puis overlays), primary, overlay, ou numero de plan
+video_plane = auto
+
+# API HTTP
+http_port = 8081
+start_camera = 1
+
+# Calques
+font = DejaVu Sans
+umd_off_alpha = 0.30
+
+# Ligne d'etat dans le terminal toutes les N secondes (0 = jamais)
+stats_interval_s = 10
+# Priorite temps reel des threads (0 = desactive, 10 = conseille en root)
+rt_priority = 0
+# Journal FFmpeg : quiet, error, warning, info, verbose
+loglevel = error
+
+# Les URL sont sans latency= (elle vient de srt_latency_ms ci-dessus).
+[cam1]
+url = srt://192.168.104.253:8890?mode=caller&streamid=read:cam1
+label = CAM 1
+tally = off
+
+[cam2]
+url = srt://192.168.104.253:8890?mode=caller&streamid=read:cam2
+label = CAM 2
+tally = off
+
+[cam3]
+url = srt://192.168.104.253:8890?mode=caller&streamid=read:cam3
+label = CAM 3
+tally = off
+
+[cam4]
+url = srt://192.168.104.253:8890?mode=caller&streamid=read:cam4
+label = CAM 4
+tally = off
