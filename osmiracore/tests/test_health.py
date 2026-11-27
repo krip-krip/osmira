@@ -1,12 +1,7 @@
-from fastapi.testclient import TestClient
-
 from osmiracore import __version__
-from osmiracore.main import app
-
-client = TestClient(app)
 
 
-def test_health_returns_ok_and_version():
+def test_health_returns_ok_and_version(client):
     response = client.get("/api/health")
 
     assert response.status_code == 200
