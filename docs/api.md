@@ -145,13 +145,43 @@ reconnecte et repart de l'événement `state`.
 curl -N localhost:8000/api/stations/panelTest/events
 ```
 
+### État d'un poste (signal de vie)
+
+- `POST /api/stations/{id}/status` — envoyé par l'agent toutes les 5 s
+  (`status_interval_s`) ; réponse `204`, `404` si le poste n'est pas déclaré.
+  Les champs inconnus sont ignorés (un agent plus récent reste accepté).
+
+```json
+{
+  "agent_version": "0.1.0",
+  "hostname": "panelTest",
+  "addresses": ["10.7.1.30", "100.83.219.117"],
+  "config_version": "sha256:…",
+  "selected_camera": "cam2",
+  "player": {
+    "running": true,
+    "shown_camera": "cam2",
+    "cameras": [{"camera_id": "cam1", "state": "streaming", "fps": 49.9, "mbps": 16.2,
+                 "width": 1920, "height": 1080, "connects": 1, "decode_errors": 0,
+                 "last_error": ""}]
+  },
+  "hardware": {"model": "Raspberry Pi 4 Model B Rev 1.5", "arch": "aarch64", "ram_mb": 905,
+               "os": "Debian GNU/Linux 13 (trixie)", "kernel": "6.12…", "python": "3.13.5"},
+  "system": {"uptime_s": 3600, "temp_c": 51.6, "mem_available_mb": 450,
+             "cma_free_mb": 71, "cma_total_mb": 512}
+}
+```
+
+- `GET /api/stations/{id}/status` → `online` (dernier état reçu il y a moins de
+  `OSMIRACORE_ONLINE_TIMEOUT_S`, 15 s par défaut), `last_seen` (UTC),
+  `seconds_since`, `config_up_to_date` (la version appliquée par le poste
+  est-elle la version actuelle ?) et le dernier `status` reçu.
+- `GET /api/matrix` : chaque destination porte aussi `online`.
+
 ## Prévu (incréments suivants, à préciser le moment venu)
 
 - Événements `tally` (`{"camera_id", "tally"}`) et `umd`
   (`{"camera_id", "text"}`) sur le même flux ; ajoutés à `state`.
-- `POST /api/stations/{id}/status` — toutes les quelques secondes : version de
-  config appliquée, caméra affichée, état des flux, manette ; sert de signal
-  de vie (poste « hors ligne » après N secondes sans message).
 - `POST /api/tally` — pour l'interface web et les modules (mélangeur) :
   `{"camera_id": "cam1", "tally": "pgm"}` ; `POST /api/umd` idem.
 - Sites, profils de manette, prise de main.

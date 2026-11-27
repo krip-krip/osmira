@@ -1,5 +1,7 @@
 """Local HTTP API of ptzview (see osmiracam/player/README.md)."""
 
+from typing import Any
+
 import httpx2
 
 
@@ -20,3 +22,12 @@ class PtzviewClient:
             raise PtzviewUnavailable(repr(exc)) from exc
         if response.status_code != 200:
             raise PtzviewUnavailable(f"/select/{slot} answered {response.status_code}")
+
+    async def status(self) -> dict[str, Any]:
+        """ptzview's /status: shown input, per-input stream state, system figures."""
+        try:
+            response = await self._http.get("/status")
+            response.raise_for_status()
+            return response.json()
+        except (httpx2.HTTPError, ValueError) as exc:
+            raise PtzviewUnavailable(repr(exc)) from exc

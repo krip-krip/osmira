@@ -19,7 +19,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from osmiracam_agent import ptzview_conf
+from osmiracam_agent import __version__, ptzview_conf, station_info
 from osmiracam_agent.core_client import CoreClient, CoreEvent, CoreUnavailable
 from osmiracam_agent.ptzview_client import PtzviewClient, PtzviewUnavailable
 from osmiracam_agent.settings import Settings
@@ -42,6 +42,7 @@ class Agent:
         supervisor: Supervisor,
         ptzview: PtzviewClient,
         selection_store: SelectionStore,
+        hardware: dict[str, object] | None = None,
     ) -> None:
         self._settings = settings
         self._core = core
@@ -49,6 +50,8 @@ class Agent:
         self._supervisor = supervisor
         self._ptzview = ptzview
         self._selection_store = selection_store
+        self._hardware = hardware if hardware is not None else station_info.hardware()
+        self._status_error: str | None = None
         self._refresh_lock = asyncio.Lock()
         self._select_task: asyncio.Task[None] | None = None
         self._core_reachable: bool | None = None
@@ -184,6 +187,81 @@ class Agent:
                 self._events_connected = False
             await _wait(stop, self._settings.events_retry_s)
 
+    # --- status report (heartbeat) ----------------------------------------------
+
+    async def status(self) -> dict[str, Any]:
+        """What the Core shows about this station (see docs/api.md)."""
+        player: dict[str, Any] = {"running": self._supervisor.running, "shown_camera": None}
+        cameras: list[dict[str, Any]] = []
+        system: dict[str, Any] = {
+            "uptime_s": station_info.uptime_s(),
+            "temp_c": station_info.temperature_c(),
+        }
+        ptz_status = None
+        if self._supervisor.running:
+            with contextlib.suppress(PtzviewUnavailable):
+                ptz_status = await self._ptzview.status()
+        if ptz_status is not None and self.config is not None:
+            slots = ptzview_conf.slot_cameras(self.config, self._settings.ptzview.slots)
+            for entry in ptz_status.get("cameras", []):
+                index = int(entry.get("cam", 0)) - 1
+                camera = slots[index] if 0 <= index < len(slots) else None
+                if camera is None:
+                    continue  # free input
+                if entry.get("cam") == ptz_status.get("active"):
+                    player["shown_camera"] = camera.id
+                cameras.append(
+                    {
+                        "camera_id": camera.id,
+                        **{
+                            key: entry.get(key)
+                            for key in (
+                                "state",
+                                "fps",
+                                "mbps",
+                                "width",
+                                "height",
+                                "connects",
+                                "decode_errors",
+                                "last_error",
+                            )
+                        },
+                    }
+                )
+            ptz_system = ptz_status.get("system", {})
+            system.update(
+                {
+                    "temp_c": ptz_system.get("temp_c", system["temp_c"]),
+                    "mem_available_mb": ptz_system.get("mem_available_kb", 0) // 1024,
+                    "cma_free_mb": ptz_system.get("cma_free_kb", 0) // 1024,
+                    "cma_total_mb": ptz_system.get("cma_total_kb", 0) // 1024,
+                }
+            )
+        player["cameras"] = cameras
+        return {
+            "agent_version": __version__,
+            "hostname": station_info.hostname(),
+            "addresses": station_info.addresses(),
+            "config_version": self.config.version if self.config else None,
+            "selected_camera": self.selected,
+            "player": player,
+            "hardware": self._hardware,
+            "system": system,
+        }
+
+    async def report(self, stop: asyncio.Event) -> None:
+        """Send the status every status_interval_s: the Core's heartbeat."""
+        while not stop.is_set():
+            try:
+                await self._core.post_status(await self.status())
+            except CoreUnavailable as exc:
+                if str(exc) != self._status_error:  # log each new problem once
+                    log.warning("status not delivered: %s", exc)
+                self._status_error = str(exc)
+            else:
+                self._status_error = None
+            await _wait(stop, self._settings.status_interval_s)
+
     # --- main loop ----------------------------------------------------------------
 
     async def poll(self, stop: asyncio.Event) -> None:
@@ -196,6 +274,7 @@ class Agent:
         tasks = [
             asyncio.create_task(self.poll(stop), name="poll"),
             asyncio.create_task(self.listen(stop), name="events"),
+            asyncio.create_task(self.report(stop), name="status"),
         ]
         await stop.wait()
         log.info("stopping")

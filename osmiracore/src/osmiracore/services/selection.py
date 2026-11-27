@@ -37,7 +37,8 @@ def output_selections(session: Session, station: Station) -> list[OutputSelectio
     ]
 
 
-def build_matrix(session: Session) -> Matrix:
+def build_matrix(session: Session, online: set[str] | None = None) -> Matrix:
+    """`online`: ids of the stations currently online (see services.status)."""
     sources = [
         MatrixSource(camera_id=c.id, label=c.label)
         for c in session.scalars(select(Camera).order_by(Camera.id))
@@ -60,6 +61,7 @@ def build_matrix(session: Session) -> Matrix:
                     output=selection.output,
                     selected=selection.camera_id,
                     allowed=allowed,
+                    online=station.id in (online or set()),
                 )
             )
     return Matrix(sources=sources, destinations=destinations)

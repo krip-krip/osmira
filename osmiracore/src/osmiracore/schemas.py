@@ -132,6 +132,8 @@ class MatrixDestination(StrictModel):
     selected: str | None
     # Cameras this output may show (station has the "view" right on them).
     allowed: list[str]
+    # The station reported its status recently.
+    online: bool = False
 
 
 class Matrix(StrictModel):
@@ -139,6 +141,57 @@ class Matrix(StrictModel):
 
     sources: list[MatrixSource]
     destinations: list[MatrixDestination]
+
+
+class LenientModel(BaseModel):
+    # Sent by the stations: a newer agent may add fields, an older Core ignores them.
+    model_config = ConfigDict(extra="ignore")
+
+
+class PlayerCamera(LenientModel):
+    camera_id: str
+    state: str | None = None
+    fps: float | None = None
+    mbps: float | None = None
+    width: int | None = None
+    height: int | None = None
+    connects: int | None = None
+    decode_errors: int | None = None
+    last_error: str | None = None
+
+
+class PlayerStatus(LenientModel):
+    running: bool = False
+    shown_camera: str | None = None
+    cameras: list[PlayerCamera] = Field(default_factory=list)
+
+
+class StationStatusIn(LenientModel):
+    """Status a station sends every few seconds; it is also its heartbeat."""
+
+    agent_version: str
+    hostname: str | None = None
+    addresses: list[str] = Field(default_factory=list)
+    # Version of the configuration the station applies.
+    config_version: str | None = None
+    # Camera the Core chose for output 1, as the station knows it.
+    selected_camera: str | None = None
+    player: PlayerStatus = Field(default_factory=PlayerStatus)
+    # Model, architecture, RAM, OS, kernel...
+    hardware: dict[str, Any] = Field(default_factory=dict)
+    # Temperature, free memory, CMA, uptime...
+    system: dict[str, Any] = Field(default_factory=dict)
+
+
+class StationStatusOut(StrictModel):
+    station_id: str
+    online: bool
+    # ISO 8601 UTC time of the last status, None if never seen.
+    last_seen: str | None
+    seconds_since: float | None
+    # Does the station run the current configuration? None if unknown.
+    config_up_to_date: bool | None
+    status: StationStatusIn | None
 
 
 class StationConfig(StrictModel):

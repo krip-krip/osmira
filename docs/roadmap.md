@@ -32,8 +32,11 @@ affichée depuis le Core. Pas de pilotage PTZ à cette étape.
 - [x] Interface web : matrice de bascule (caméras en lignes, sorties des
   stations en colonnes, repérées par l'identifiant de la station).
 - [x] Interface web : pages caméras, stations, droits.
-- [ ] Stats SRT : collecte MediaMTX, signal de vie des Pi, page Liaisons
-  (courbes uPlot, sessions de mesure, export CSV).
+- [x] État des postes : signal de vie de l'agent (versions, matériel, flux),
+  en ligne / hors ligne dans les pages Stations et Matrice.
+- [ ] Paramètres média des caméras en « auto » (détection des flux réels).
+- [ ] Stats SRT : collecte MediaMTX, page Liaisons (courbes uPlot, sessions
+  de mesure, export CSV).
 - [ ] `ptzview` : nombre de caméras configurable, rechargement de la config
   sans redémarrage.
 - [ ] Tally/UMD par SSE.

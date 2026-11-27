@@ -1,0 +1,59 @@
+{#- Reloaded every 5 s: online state follows the stations' heartbeat. -#}
+<div id="stations" hx-get="/stations/table" hx-trigger="every 5s" hx-swap="outerHTML">
+{% if not rows %}
+  <p class="empty">No station yet.</p>
+{% else %}
+<div class="scroll">
+  <table class="list stations">
+    <thead>
+      <tr>
+        <th>Station</th><th>Status</th><th>Agent</th><th>Config</th><th>Showing</th>
+        <th>Decoding</th><th>Outputs</th><th>Hardware</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}{% set s = row.station %}{% set st = row.status %}{% set info = st.status %}
+      <tr>
+        <td>
+          <a class="station-id" href="/stations/{{ s.id }}/rights">{{ s.id }}</a>
+          <span class="sub">{{ s.label }}</span>
+        </td>
+        <td>
+          {% if st.online %}
+            <span class="dot online" aria-hidden="true"></span> online
+          {% else %}
+            <span class="dot offline" aria-hidden="true"></span> offline
+          {% endif %}
+          <span class="sub" title="{{ st.last_seen or '' }}">{{ st.seconds_since|ago }}</span>
+        </td>
+        <td>{{ info.agent_version if info else "–" }}</td>
+        <td>
+          {% if st.config_up_to_date is none %}<span class="muted">–</span>
+          {% elif st.config_up_to_date %}<span class="ok" title="{{ info.config_version }}">✓ up to date</span>
+          {% else %}<span class="warn" title="{{ info.config_version }}">✗ outdated</span>{% endif %}
+        </td>
+        <td>
+          {% if info and info.player.running %}{{ info.player.shown_camera or "–" }}
+          {% elif info %}<span class="warn">player stopped</span>
+          {% else %}–{% endif %}
+        </td>
+        <td>{{ row.decoding }} / {{ s.max_decoders }}</td>
+        <td>{{ s.outputs }}</td>
+        <td class="hardware">
+          {% if info %}{% set hw = info.hardware %}{% set sys = info.system %}
+            {{ hw.model or hw.arch or "–" }}
+            <span class="sub">
+              {% if hw.ram_mb %}{{ hw.ram_mb }} MB RAM · {% endif %}{{ hw.os or "" }}
+              {% if sys.temp_c is not none and sys.temp_c is defined %} · {{ sys.temp_c }} °C{% endif %}
+              {% if sys.cma_free_mb %} · CMA free {{ sys.cma_free_mb }} MB{% endif %}
+            </span>
+          {% else %}<span class="muted">never seen</span>{% endif %}
+        </td>
+        <td class="actions"><a href="/stations/{{ s.id }}/rights">Rights</a> · <a href="/stations/{{ s.id }}">Edit</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+</div>

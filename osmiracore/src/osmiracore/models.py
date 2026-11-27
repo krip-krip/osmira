@@ -77,3 +77,19 @@ class Selection(Base):
     )
     output: Mapped[int] = mapped_column(primary_key=True)
     camera_id: Mapped[str] = mapped_column(ForeignKey("cameras.id", ondelete="CASCADE"))
+
+
+class StationStatus(Base):
+    """Last status reported by a station (POST /api/stations/{id}/status).
+
+    Kept in the database so that "last seen" survives a Core restart.
+    """
+
+    __tablename__ = "station_status"
+
+    station_id: Mapped[str] = mapped_column(
+        ForeignKey("stations.id", ondelete="CASCADE"), primary_key=True
+    )
+    # Core clock, seconds since the epoch (UTC).
+    received_at: Mapped[float]
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON)

@@ -15,7 +15,8 @@
           <th class="corner">Source \ Destination</th>
           {% for dest in matrix.destinations %}
             <th class="dest" title="{{ dest.station_label }}">
-              <span class="station-id">{{ dest.station_id }}</span>
+              <span class="station-id"><span class="dot {{ 'online' if dest.online else 'offline' }}"
+                    title="{{ 'online' if dest.online else 'offline' }}"></span>{{ dest.station_id }}</span>
               <span class="output">out {{ dest.output }}</span>
               <span class="station-label">{{ dest.station_label }}</span>
             </th>

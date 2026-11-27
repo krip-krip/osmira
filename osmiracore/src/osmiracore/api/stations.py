@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from sqlalchemy.orm import Session, sessionmaker
 
-from osmiracore.api.deps import BusDep, SessionDep
+from osmiracore.api.deps import BusDep, SessionDep, SettingsDep
 from osmiracore.schemas import (
     OutputSelection,
     RightIn,
@@ -18,9 +18,12 @@ from osmiracore.schemas import (
     StationConfig,
     StationCreate,
     StationOut,
+    StationStatusIn,
+    StationStatusOut,
     StationUpdate,
 )
 from osmiracore.services import config, events, selection, stations
+from osmiracore.services import status as heartbeat
 
 router = APIRouter(prefix="/api/stations", tags=["stations"])
 
@@ -118,6 +121,22 @@ def set_selection(
     selection.set_selection(session, station_id, output, data.camera_id)
     bus.sync(session)
     return OutputSelection(output=output, camera_id=data.camera_id)
+
+
+# --- status (heartbeat) -------------------------------------------------------
+
+
+@router.post("/{station_id}/status", status_code=status.HTTP_204_NO_CONTENT)
+def post_status(station_id: str, data: StationStatusIn, session: SessionDep) -> None:
+    """Sent by the station every few seconds: what it runs and shows, its hardware."""
+    heartbeat.record_status(session, station_id, data)
+
+
+@router.get("/{station_id}/status")
+def get_status(station_id: str, session: SessionDep, settings: SettingsDep) -> StationStatusOut:
+    """Online if the last status is recent; config_up_to_date compares versions."""
+    station = stations.get_station(session, station_id)
+    return heartbeat.station_status(session, station, settings.online_timeout_s)
 
 
 # --- events (SSE) -------------------------------------------------------------

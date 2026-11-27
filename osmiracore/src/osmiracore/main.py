@@ -38,6 +38,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         engine.dispose()
 
     app = FastAPI(title="OsmiraCore", version=__version__, lifespan=lifespan)
+    app.state.settings = settings
 
     @app.exception_handler(NotFoundError)
     async def not_found(_request: Request, exc: NotFoundError) -> JSONResponse:
