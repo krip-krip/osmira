@@ -111,13 +111,6 @@ def test_matrix(setup):
     assert [s["camera_id"] for s in matrix["sources"]] == ["cam1", "cam2", "cam3", "cam4", "cam5"]
     assert matrix["destinations"] == [
         {
-            "station_id": "other",
-            "station_label": "Cadreur 2",
-            "output": 1,
-            "selected": None,
-            "allowed": [],
-        },
-        {
             "station_id": "panelTest",
             "station_label": "Cadreur 1",
             "output": 1,
@@ -130,5 +123,12 @@ def test_matrix(setup):
             "output": 2,
             "selected": "cam3",
             "allowed": ["cam1", "cam2", "cam3"],
+        },
+        {
+            "station_id": "other",
+            "station_label": "Cadreur 2",
+            "output": 1,
+            "selected": None,
+            "allowed": [],
         },
     ]

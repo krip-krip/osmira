@@ -43,7 +43,8 @@ def build_matrix(session: Session) -> Matrix:
         for c in session.scalars(select(Camera).order_by(Camera.id))
     ]
     destinations: list[MatrixDestination] = []
-    for station in stations.list_stations(session):
+    # Rows in the order people read them: by station name, then id.
+    for station in sorted(stations.list_stations(session), key=lambda s: (s.label, s.id)):
         allowed = list(
             session.scalars(
                 select(Right.camera_id)

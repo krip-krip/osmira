@@ -73,7 +73,8 @@ docs/               vision, architecture, decisions/ (ADR), mesures/, roadmap
   - `uv run ruff check` et `uv run ruff format --check` : style (la CI échoue
     sinon ; `uv run ruff format` corrige la mise en forme) ;
   - `uv run uvicorn osmiracore.main:app --reload` : serveur de dev sur
-    http://localhost:8000 (doc interactive sur `/docs`).
+    http://localhost:8000 (interface web sur `/`, doc interactive de l'API sur
+    `/docs`). Ajouter `--host 0.0.0.0` pour qu'un Pi puisse le joindre.
   - CI : `.github/workflows/core.yml` (job `test`), à chaque PR et sur `main`.
 - Agent OsmiraCam (`cd osmiracam/agent`, outil `uv`) : mêmes commandes que le
   Core (`uv sync`, `uv run pytest`, `uv run ruff check`, `uv run ruff format`) ;

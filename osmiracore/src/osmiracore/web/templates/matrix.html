@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% set active = "matrix" %}
+{% block title %}Matrix{% endblock %}
+{% block content %}
+<h1>Matrix</h1>
+<p class="hint">
+  Sources (cameras) in columns, destinations (station video outputs) in rows.
+  Click a cell to show that camera on that output. Grey cells: the station
+  has no <em>view</em> right on the camera.
+</p>
+{% include "_matrix_grid.html" %}
+{% endblock %}
