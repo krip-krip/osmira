@@ -12,9 +12,11 @@
 - [x] CI minimale (compilation de `ptzview`).
 
 ## Étape 2 — Conception d'OsmiraCore (sans code)
-- [ ] Modèle de données détaillé (`docs/modele-donnees.md`) : site, caméra
+- [x] Modèle de données détaillé (`docs/modele-donnees.md`) : site, caméra
   (média + contrôle), poste, profil de manette, droits, tally/UMD.
-- [ ] Spécification de l'API REST + SSE (`docs/api.md`).
+- [x] Spécification de l'API REST + SSE (`docs/api.md`) : incrément 1
+  détaillé, SSE et signal de vie esquissés.
+- [x] Pile technique du Core (ADR 0008).
 - [ ] Maquettes des écrans de l'interface web.
 
 ## Étape 3 — Premier incrément de bout en bout

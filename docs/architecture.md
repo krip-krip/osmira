@@ -78,11 +78,11 @@
 
 ## Communication OsmiraCore ↔ OsmiraCam (voir ADR 0005)
 
-1. Au démarrage : `GET /api/postes/<id>/config` → configuration complète avec
+1. Au démarrage : `GET /api/stations/<id>/config` → configuration complète avec
    numéro de version ; enregistrée en local.
-2. Connexion permanente `GET /api/postes/<id>/events` (SSE) : événements
+2. Connexion permanente `GET /api/stations/<id>/events` (SSE) : événements
    `config_changed`, `tally`, `umd`…
-3. `POST /api/postes/<id>/etat` toutes les quelques secondes (état + signal de vie).
+3. `POST /api/stations/<id>/status` toutes les quelques secondes (état + signal de vie).
 4. Après une coupure : reconnexion SSE, nouvelle récupération de la config si la
    version a changé.
 

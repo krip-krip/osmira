@@ -1,6 +1,7 @@
 # 0005 — Communication Core ↔ postes : REST + SSE (pas MQTT)
 
-- Statut : Accepté
+- Statut : Accepté (noms des routes passés en anglais par l'ADR 0008 :
+  `/api/stations/{id}/config`, `/events`, `/status`)
 - Date : 2026-11-26
 
 ## Contexte
