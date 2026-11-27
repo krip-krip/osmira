@@ -27,6 +27,8 @@ class FakeCore:
         self.config = config
         self.down = False
         self.connections = 0
+        self.statuses: list[dict] = []
+        self.unknown_station = False
         self._stream: asyncio.Queue[bytes | None] | None = None
 
     def handler(self, request: httpx2.Request) -> httpx2.Response:
@@ -34,6 +36,11 @@ class FakeCore:
             raise httpx2.ConnectError("connection refused")
         if request.url.path.endswith("/events"):
             return self._events()
+        if request.url.path.endswith("/status"):
+            if self.unknown_station:
+                return httpx2.Response(404, json={"detail": "station 'panelTest' not found"})
+            self.statuses.append(json.loads(request.content))
+            return httpx2.Response(204)
         etag = f'"{self.config["version"]}"'
         if request.headers.get("if-none-match") == etag:
             return httpx2.Response(304, headers={"ETag": etag})
@@ -69,8 +76,42 @@ class FakePtzview:
     def handler(self, request: httpx2.Request) -> httpx2.Response:
         if self.down:
             raise httpx2.ConnectError("connection refused")
+        if request.url.path == "/status":
+            return httpx2.Response(200, json=PTZVIEW_STATUS)
         self.selects.append(int(request.url.path.rsplit("/", 1)[1]))
         return httpx2.Response(200, json={})
+
+
+def ptz_cam(n: int, fps: float) -> dict:
+    return {
+        "cam": n,
+        "label": f"CAM{n}",
+        "tally": "off",
+        "state": "streaming",
+        "connected": True,
+        "signal": True,
+        "fps": fps,
+        "mbps": 16.2,
+        "width": 1920,
+        "height": 1080,
+        "connects": 1,
+        "decode_errors": 3,
+        "last_error": "",
+    }
+
+
+# ptzview /status with cam2 on screen; inputs 3 and 4 are free.
+PTZVIEW_STATUS = {
+    "ok": True,
+    "active": 2,
+    "cameras": [ptz_cam(1, 49.9), ptz_cam(2, 50.0), ptz_cam(3, 0), ptz_cam(4, 0)],
+    "system": {
+        "mem_available_kb": 461728,
+        "cma_total_kb": 524288,
+        "cma_free_kb": 73412,
+        "temp_c": 51.6,
+    },
+}
 
 
 def make_agent(settings, core: FakeCore, spawner: FakeSpawner, ptzview: FakePtzview | None = None):
@@ -88,6 +129,7 @@ def make_agent(settings, core: FakeCore, spawner: FakeSpawner, ptzview: FakePtzv
         Supervisor(spawner, restart_delay_s=0.01, stop_timeout_s=0.1),
         PtzviewClient(local_http),
         SelectionStore(settings.state_dir),
+        hardware={"model": "Raspberry Pi 4 Model B Rev 1.5", "ram_mb": 905},
     )
 
 
@@ -295,3 +337,64 @@ async def test_full_run_with_event_stream(settings):
     stop.set()
     await asyncio.wait_for(task, 2)
     assert all(p.returncode is not None for p in spawner.processes)
+
+
+# --- status report (heartbeat) ------------------------------------------------
+
+
+async def test_status_before_any_configuration(settings):
+    agent = make_agent(settings, FakeCore(None), FakeSpawner())
+
+    status = await agent.status()
+
+    assert status["config_version"] is None
+    assert status["player"] == {"running": False, "shown_camera": None, "cameras": []}
+    assert status["hardware"]["model"].startswith("Raspberry Pi 4")
+    assert status["agent_version"] and status["hostname"]
+
+
+async def test_status_maps_ptzview_inputs_to_cameras(settings):
+    spawner = FakeSpawner()
+    agent = make_agent(settings, FakeCore(core_config(TWO_CAMS)), spawner)
+    await agent.refresh()
+    await until(lambda: len(spawner.processes) == 1)
+
+    status = await agent.status()
+
+    assert status["config_version"] == "sha256:v1"
+    assert status["player"]["running"] is True
+    assert status["player"]["shown_camera"] == "cam2"
+    cams = status["player"]["cameras"]
+    assert [c["camera_id"] for c in cams] == ["cam1", "cam2"]  # free inputs left out
+    assert cams[0]["fps"] == 49.9 and cams[0]["width"] == 1920 and cams[0]["decode_errors"] == 3
+    assert status["system"]["cma_free_mb"] == 71
+    assert status["system"]["temp_c"] == 51.6
+
+
+async def test_run_reports_status_regularly(settings):
+    core = FakeCore(core_config(TWO_CAMS))
+    agent = make_agent(settings, core, FakeSpawner())
+    stop = asyncio.Event()
+    task = asyncio.create_task(agent.run(stop))
+
+    await until(lambda: len(core.statuses) >= 3)  # status_interval_s is short in tests
+    stop.set()
+    await asyncio.wait_for(task, 2)
+
+    assert core.statuses[-1]["config_version"] == "sha256:v1"
+
+
+async def test_unknown_station_is_logged_once(settings, caplog):
+    core = FakeCore(core_config(TWO_CAMS))
+    core.unknown_station = True
+    agent = make_agent(settings, core, FakeSpawner())
+    stop = asyncio.Event()
+
+    task = asyncio.create_task(agent.report(stop))
+    await asyncio.sleep(0.1)
+    stop.set()
+    await asyncio.wait_for(task, 2)
+
+    refused = [r for r in caplog.records if "status not delivered" in r.message]
+    assert len(refused) == 1
+    assert "404" in refused[0].message

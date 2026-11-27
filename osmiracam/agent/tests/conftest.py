@@ -44,6 +44,7 @@ def settings(tmp_path: Path) -> Settings:
         state_dir=tmp_path / "state",
         poll_interval_s=0.01,
         events_retry_s=0.01,
+        status_interval_s=0.01,
         ptzview=PtzviewSettings(
             binary=tmp_path / "ptzview",
             conf_path=tmp_path / "state" / "ptzview.conf",

@@ -116,6 +116,7 @@ def test_matrix(setup):
             "output": 1,
             "selected": None,
             "allowed": ["cam1", "cam2", "cam3"],
+            "online": False,
         },
         {
             "station_id": "panelTest",
@@ -123,6 +124,7 @@ def test_matrix(setup):
             "output": 2,
             "selected": "cam3",
             "allowed": ["cam1", "cam2", "cam3"],
+            "online": False,
         },
         {
             "station_id": "other",
@@ -130,5 +132,6 @@ def test_matrix(setup):
             "output": 1,
             "selected": None,
             "allowed": [],
+            "online": False,
         },
     ]

@@ -51,6 +51,8 @@ th.corner { color: var(--muted); font-weight: 400; text-align: left; font-size: 
 th.source { text-align: left; padding-right: 0.8rem; }
 th.dest { padding: 0 0.3rem 0.3rem; min-width: 5.5rem; vertical-align: bottom; line-height: 1.25; }
 th.dest span { display: block; }
+th.dest span.station-id { white-space: nowrap; }
+th.dest .dot { display: inline-block; }
 .station-id { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 0.9rem; }
 .output, .camera-id, .station-label { color: var(--muted); font-weight: 400; font-size: 0.8rem; }
 
@@ -117,3 +119,13 @@ button:hover, .button:hover { border-color: var(--accent); }
 .danger { color: var(--error); }
 .danger:hover { border-color: var(--error); }
 .danger-zone { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--line); max-width: 72rem; }
+
+/* --- station status ----------------------------------------------------------- */
+.dot { display: inline-block; width: 0.6rem; height: 0.6rem; border-radius: 50%; margin-right: 0.35rem; vertical-align: 0.05rem; }
+.dot.online { background: #2fbf71; box-shadow: 0 0 0 2px color-mix(in srgb, #2fbf71 30%, transparent); }
+.dot.offline { background: transparent; border: 1.5px solid var(--muted); }
+.sub { display: block; color: var(--muted); font-size: 0.8rem; }
+.ok { color: #2fbf71; }
+.warn { color: #e0a020; }
+table.stations td { vertical-align: top; }
+td.hardware { white-space: normal; min-width: 14rem; }

@@ -6,9 +6,10 @@ from fastapi import APIRouter, Form, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
-from osmiracore.api.deps import BusDep, SessionDep
+from osmiracore.api.deps import BusDep, SessionDep, SettingsDep
 from osmiracore.models import Right
 from osmiracore.services import cameras, stations
+from osmiracore.services import status as heartbeat
 from osmiracore.services.errors import ConflictError, NotFoundError
 from osmiracore.web.forms import CameraForm, FormError, RightForm, StationForm
 from osmiracore.web.templating import TEMPLATES
@@ -122,8 +123,22 @@ def _camera_form(
 
 
 @router.get("/stations")
-def station_list(request: Request, session: SessionDep) -> HTMLResponse:
-    rows = []
+def station_list(request: Request, session: SessionDep, settings: SettingsDep) -> HTMLResponse:
+    return TEMPLATES.TemplateResponse(
+        request, "stations.html", {"active": "stations", "rows": _station_rows(session, settings)}
+    )
+
+
+@router.get("/stations/table")
+def station_table(request: Request, session: SessionDep, settings: SettingsDep) -> HTMLResponse:
+    """The table alone: htmx reloads it every few seconds (online status)."""
+    return TEMPLATES.TemplateResponse(
+        request, "_stations_table.html", {"rows": _station_rows(session, settings)}
+    )
+
+
+def _station_rows(session: Session, settings: SettingsDep) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
     for station in stations.list_stations(session):
         rights = stations.list_rights(session, station.id)
         rows.append(
@@ -131,11 +146,10 @@ def station_list(request: Request, session: SessionDep) -> HTMLResponse:
                 "station": station,
                 "decoding": sum(r.decode for r in rights),
                 "viewable": sum(r.view for r in rights),
+                "status": heartbeat.station_status(session, station, settings.online_timeout_s),
             }
         )
-    return TEMPLATES.TemplateResponse(
-        request, "stations.html", {"active": "stations", "rows": rows}
-    )
+    return rows
 
 
 @router.get("/stations/new")

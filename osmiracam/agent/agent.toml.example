@@ -3,13 +3,16 @@
 
 # Address of OsmiraCore (through NetBird if remote).
 core_url = "http://192.168.104.10:8000"
-# Fixed identifier of this station, as declared in the Core.
-station_id = "panelTest"
+# Identifier of this station, as declared in the Core.
+# Default: the hostname of the Pi.
+# station_id = "panelTest"
 # Local copy of the last configuration (used when the Core is unreachable).
 state_dir = "state"
 # Seconds between two configuration checks.
 poll_interval_s = 10
 request_timeout_s = 5
+# Seconds between two status reports (heartbeat) to the Core.
+status_interval_s = 5
 
 [ptzview]
 binary = "../player/ptzview"

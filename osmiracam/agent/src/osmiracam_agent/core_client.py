@@ -49,6 +49,19 @@ class CoreClient:
         except ValueError as exc:
             raise CoreUnavailable("Core sent invalid JSON") from exc
 
+    async def post_status(self, status: dict[str, Any]) -> None:
+        """Report the station status (also its heartbeat)."""
+        try:
+            response = await self._http.post(
+                f"/api/stations/{self._station_id}/status", json=status
+            )
+        except httpx2.HTTPError as exc:
+            raise CoreUnavailable(f"cannot reach the Core: {exc!r}") from exc
+        if response.status_code >= 300:
+            raise CoreUnavailable(
+                f"Core refused the status ({response.status_code}): {response.text[:200]}"
+            )
+
     async def events(self) -> AsyncIterator[CoreEvent]:
         """Server-Sent Events of this station, until the connection ends.
 

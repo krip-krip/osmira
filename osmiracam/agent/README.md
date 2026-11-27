@@ -24,6 +24,15 @@ Programme Python qui tourne sur le Raspberry Pi à côté de `ptzview` :
 Si le Core n'a choisi aucune caméra (ou une caméra que le poste ne peut pas
 voir), le poste affiche sa première caméra visible (ADR 0009).
 
+Il envoie aussi son **état** au Core toutes les 5 s (`POST /api/stations/<id>/status`,
+c'est son signal de vie) : versions de l'agent et de la config, caméra
+affichée, flux reçus par `ptzview` (i/s, débit, résolution, erreurs),
+matériel (modèle du Pi, RAM, OS), température, CMA libre. La page Stations du
+Core l'affiche (en ligne / hors ligne).
+
+Identifiant du poste : `station_id` dans `agent.toml`, ou à défaut le
+**hostname** du Pi.
+
 Pas encore : tally/UMD, manette, pilotage PTZ, deuxième sortie HDMI.
 
 ## Limite actuelle de ptzview
@@ -38,7 +47,7 @@ le journal) ; les entrées libres affichent NO SIGNAL.
 curl -LsSf https://astral.sh/uv/install.sh | sh     # installe uv dans ~/.local/bin
 cd ~/osmira/osmiracam/player && make                 # compile ptzview (voir son README)
 cd ~/osmira/osmiracam/agent && uv sync               # environnement Python de l'agent
-cp agent.toml.example agent.toml                     # puis régler core_url et station_id
+cp agent.toml.example agent.toml                     # puis régler core_url (station_id = hostname par défaut)
 ```
 
 ## Lancement (à la main, depuis SSH)

@@ -56,8 +56,13 @@ Un poste = un Raspberry Pi OsmiraCam.
 | `max_decoders` | entier | `4` | nombre de flux décodables en permanence (ADR 0002) |
 | `outputs` | entier ≥ 1 | `1` | sorties vidéo (HDMI) : les destinations de la matrice |
 
-Plus tard : `site_id`, `gamepad_profile_id`, jeton d'accès, dernier signal
-de vie et état remonté (`POST /status`).
+Dernier état remonté par le poste (`POST /status`) : table `station_status`
+(heure de réception côté Core + contenu JSON), une ligne par poste, supprimée
+avec lui. Le poste est « en ligne » si cet état a moins de 15 s.
+
+L'identifiant est le `station_id` de l'agent : par défaut le hostname du Pi.
+
+Plus tard : `site_id`, `gamepad_profile_id`, jeton d'accès.
 
 ## Right (droit d'un poste sur une caméra) — Incr. 1
 

@@ -1,5 +1,6 @@
 """Local agent settings, read from a TOML file (see agent.toml.example)."""
 
+import socket
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -31,6 +32,8 @@ class Settings:
     request_timeout_s: float = 5.0
     # Pause before reopening the event stream after it broke.
     events_retry_s: float = 2.0
+    # Seconds between two status reports to the Core (also the heartbeat).
+    status_interval_s: float = 5.0
 
 
 def load_settings(path: Path) -> Settings:
@@ -55,10 +58,12 @@ def load_settings(path: Path) -> Settings:
     )
     return Settings(
         core_url=data["core_url"].rstrip("/"),
-        station_id=data["station_id"],
+        # Defaults to the hostname of the Pi (panelTest...).
+        station_id=data.get("station_id") or socket.gethostname(),
         state_dir=resolve(data.get("state_dir", "state")),
         ptzview=ptzview,
         poll_interval_s=float(data.get("poll_interval_s", 10.0)),
         request_timeout_s=float(data.get("request_timeout_s", 5.0)),
         events_retry_s=float(data.get("events_retry_s", 2.0)),
+        status_interval_s=float(data.get("status_interval_s", 5.0)),
     )

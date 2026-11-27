@@ -100,7 +100,7 @@ def test_cameras_are_rows_and_station_outputs_are_columns(setup):
     body = page[page.index("<tbody>") : page.index("</tbody>")]
 
     # Columns: one per station output, headed by the station id (hostname).
-    assert header.count('class="station-id">panelTest<') == 2
+    assert header.count(">panelTest</span>") == 2
     assert "out 1" in header and "out 2" in header
     # Rows: one per camera.
     assert body.count('<th class="source" scope="row">') == 3
