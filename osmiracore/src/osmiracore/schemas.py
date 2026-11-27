@@ -1,8 +1,8 @@
 """API request and response bodies (Pydantic). See docs/api.md."""
 
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 # Text identifiers chosen by the user: cam1, panelTest...
 Identifier = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{1,32}$")]
@@ -55,3 +55,37 @@ class CameraOut(StrictModel):
     label: str
     media: Media
     control: ControlOut
+
+
+class StationUpdate(StrictModel):
+    label: Annotated[str, Field(min_length=1, max_length=64)]
+    max_decoders: Annotated[int, Field(ge=0, le=16)] = 4
+
+
+class StationCreate(StationUpdate):
+    id: Identifier
+
+
+class StationOut(StationUpdate):
+    id: str
+
+
+class RightIn(StrictModel):
+    position: Annotated[int, Field(ge=1, le=99)]
+    decode: bool = False
+    view: bool = False
+    control: bool = False
+
+    @model_validator(mode="after")
+    def check_levels(self) -> Self:
+        # control implies view, view implies decode (ADR 0002: only a decoded
+        # stream can be shown).
+        if self.view and not self.decode:
+            raise ValueError("'view' requires 'decode'")
+        if self.control and not self.view:
+            raise ValueError("'control' requires 'view'")
+        return self
+
+
+class RightOut(RightIn):
+    camera_id: str

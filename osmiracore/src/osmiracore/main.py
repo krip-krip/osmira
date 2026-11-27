@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import sessionmaker
 
 from osmiracore import __version__
-from osmiracore.api import cameras
+from osmiracore.api import cameras, stations
 from osmiracore.db import init_db, make_engine
 from osmiracore.services.errors import ConflictError, NotFoundError
 from osmiracore.settings import Settings, load_settings
@@ -45,6 +45,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {"status": "ok", "version": __version__}
 
     app.include_router(cameras.router)
+    app.include_router(stations.router)
     return app
 
 
