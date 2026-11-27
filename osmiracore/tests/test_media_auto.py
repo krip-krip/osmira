@@ -79,6 +79,7 @@ def test_declared_values_differing_from_the_stream(setup):
 def test_form_blank_fields_mean_auto(setup):
     form = {
         "label": "CAM 1",
+        "source": "direct",
         "srt_url": "srt://m",
         "latency_ms": "40",
         "codec": "",
@@ -91,7 +92,8 @@ def test_form_blank_fields_mean_auto(setup):
 
     setup.post("/cameras/cam1", data=form)
 
-    media = setup.get("/api/cameras/cam1").json()["media"]
+    full = setup.get("/api/cameras/cam1").json()["media"]
+    media = {k: full[k] for k in ("srt_url", "latency_ms", "codec", "width", "height", "fps")}
     assert media == {
         "srt_url": "srt://m",
         "latency_ms": 40,

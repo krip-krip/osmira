@@ -15,13 +15,14 @@
 {% else %}
 <div class="scroll">
   <table class="list">
-    <thead><tr><th>Id</th><th>Label</th><th>API</th><th>State</th><th>MediaMTX</th><th>Paths</th><th></th></tr></thead>
+    <thead><tr><th>Id</th><th>Label</th><th>API</th><th>SRT for stations</th><th>State</th><th>MediaMTX</th><th>Paths</th><th></th></tr></thead>
     <tbody>
       {% for s in servers %}{% set st = s.state %}
       <tr>
         <td><a href="/media-servers/{{ s.id }}">{{ s.id }}</a></td>
         <td>{{ s.label }}</td>
         <td class="mono">{{ s.api_url }}</td>
+        <td class="mono">{{ s.srt_address }}</td>
         <td>
           {% if not s.enabled %}<span class="muted">disabled</span>
           {% elif st.reachable is none %}<span class="muted">not polled yet</span>
@@ -32,7 +33,7 @@
         </td>
         <td>{{ st.version or "–" }}</td>
         <td>{{ st.paths }}</td>
-        <td class="actions"><a href="/media-servers/{{ s.id }}">Edit</a></td>
+        <td class="actions"><a href="/media-servers/{{ s.id }}/media">Exposed media</a> · <a href="/media-servers/{{ s.id }}">Edit</a></td>
       </tr>
       {% endfor %}
     </tbody>

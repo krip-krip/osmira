@@ -35,7 +35,11 @@ def test_create_then_get(client):
     assert created.status_code == 201
     camera = client.get("/api/cameras/cam1").json()
     assert camera["label"] == "CAM 1"
-    assert camera["media"] == CAM1["media"]
+    for key, value in CAM1["media"].items():
+        assert camera["media"][key] == value
+    # Only an SRT URL given: direct source, the URL is imposed (override).
+    assert camera["media"]["source"] == "direct"
+    assert camera["media"]["srt_url_overridden"] is True
     assert camera["control"]["host"] == "192.168.105.51"
 
 

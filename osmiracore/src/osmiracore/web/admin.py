@@ -8,10 +8,10 @@ from sqlalchemy.orm import Session
 
 from osmiracore.api.deps import BusDep, CollectorDep, SessionDep, SettingsDep
 from osmiracore.models import Right
-from osmiracore.services import cameras, stations
+from osmiracore.services import cameras, media_servers, stations
 from osmiracore.services import status as heartbeat
 from osmiracore.services.errors import ConflictError, NotFoundError
-from osmiracore.web.forms import CameraForm, FormError, RightForm, StationForm
+from osmiracore.web.forms import CameraForm, FormError, RightForm, StationForm, preview_camera
 from osmiracore.web.templating import TEMPLATES
 
 router = APIRouter(include_in_schema=False)
@@ -46,8 +46,32 @@ def camera_list(
 
 
 @router.get("/cameras/new")
-def camera_new(request: Request) -> HTMLResponse:
-    return _camera_form(request, CameraForm(), is_new=True)
+def camera_new(
+    request: Request,
+    session: SessionDep,
+    source: str | None = None,
+    media_server_id: str = "",
+    path: str = "",
+    id: str = "",  # noqa: A002  (form field name)
+    label: str = "",
+) -> HTMLResponse:
+    """Empty form, or prefilled from a media exposed by a media server."""
+    form = CameraForm(id=id, label=label, media_server_id=media_server_id, path=path)
+    if source in ("media_server", "direct"):
+        form.source = source
+    elif not media_servers.list_servers(session):
+        form.source = "direct"  # no media server declared yet
+    return _camera_form(request, session, form, is_new=True)
+
+
+@router.post("/cameras/source")
+def camera_source(
+    request: Request, session: SessionDep, form: Annotated[CameraForm, Form()]
+) -> HTMLResponse:
+    """The Source block alone, redrawn while the user changes it (htmx)."""
+    return TEMPLATES.TemplateResponse(
+        request, "_camera_source.html", {"form": form, **_source_context(session, form)}
+    )
 
 
 @router.post("/cameras/new")
@@ -58,7 +82,7 @@ def camera_create(
         cameras.create_camera(session, form.to_create())
     except FormErrors as exc:
         session.rollback()
-        return _camera_form(request, form, is_new=True, errors=_messages(exc))
+        return _camera_form(request, session, form, is_new=True, errors=_messages(exc))
     bus.sync(session)
     return _done("/cameras")
 
@@ -67,7 +91,9 @@ def camera_create(
 def camera_edit(request: Request, session: SessionDep, camera_id: str) -> HTMLResponse:
     camera = cameras.get_camera(session, camera_id)
     form = CameraForm.from_camera(camera)
-    return _camera_form(request, form, is_new=False, password_set=bool(camera.control_password))
+    return _camera_form(
+        request, session, form, is_new=False, password_set=bool(camera.control_password)
+    )
 
 
 @router.post("/cameras/{camera_id}")
@@ -86,6 +112,7 @@ def camera_update(
         camera = cameras.get_camera(session, camera_id)
         return _camera_form(
             request,
+            session,
             form,
             is_new=False,
             password_set=bool(camera.control_password),
@@ -102,8 +129,19 @@ def camera_delete(session: SessionDep, bus: BusDep, camera_id: str) -> RedirectR
     return _done("/cameras")
 
 
+def _source_context(session: Session, form: CameraForm) -> dict[str, object]:
+    servers = media_servers.list_servers(session)
+    server = next((s for s in servers if s.id == form.media_server_id), None)
+    if form.source == "media_server" and server is None and servers:
+        server = servers[0]
+        form.media_server_id = server.id
+    computed = cameras.computed_url(preview_camera(form, server), server)
+    return {"servers": servers, "server": server, "computed": computed}
+
+
 def _camera_form(
     request: Request,
+    session: Session,
     form: CameraForm,
     *,
     is_new: bool,
@@ -119,6 +157,7 @@ def _camera_form(
             "is_new": is_new,
             "password_set": password_set,
             "errors": errors or [],
+            **_source_context(session, form),
         },
         status_code=422 if errors else 200,
     )

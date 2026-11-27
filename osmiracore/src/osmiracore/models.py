@@ -3,7 +3,7 @@
 from typing import Any
 
 from sqlalchemy import JSON, ForeignKey, Index, String, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from osmiracore.db import Base
 
@@ -15,6 +15,21 @@ class Camera(Base):
     label: Mapped[str]
 
     # Media block: how a station receives the picture.
+    # Source: "media_server" (path of a MediaMTX) or "direct" (from the camera).
+    media_source: Mapped[str] = mapped_column(default="direct")
+    media_server_id: Mapped[str | None] = mapped_column(
+        ForeignKey("media_servers.id", ondelete="RESTRICT")
+    )
+    media_path: Mapped[str | None]
+    # Direct: "caller" (the station calls the camera) or "listener" (the camera
+    # calls the station).
+    direct_mode: Mapped[str | None]
+    direct_host: Mapped[str | None]
+    direct_port: Mapped[int | None]
+    media_server: Mapped["MediaServer | None"] = relationship(lazy="joined")
+    # URL imposed by the user instead of the computed one (None: computed).
+    srt_url_override: Mapped[str | None]
+    # Effective URL sent to the stations: the override, or the computed URL.
     media_srt_url: Mapped[str]
     media_latency_ms: Mapped[int]
     # Expected format; None = auto (not declared, the real stream is shown).
@@ -105,6 +120,8 @@ class MediaServer(Base):
     label: Mapped[str]
     # MediaMTX API, e.g. http://192.168.104.253:9997
     api_url: Mapped[str]
+    # Where stations read SRT streams, host:port, e.g. 192.168.104.253:8890.
+    srt_address: Mapped[str]
     api_username: Mapped[str | None]
     api_password: Mapped[str | None]
     enabled: Mapped[bool] = mapped_column(default=True)

@@ -11,14 +11,19 @@
 <div class="scroll">
   <table class="list">
     <thead>
-      <tr><th>Id</th><th>Label</th><th>SRT URL</th><th>Declared</th><th>Received</th><th>Control</th><th></th></tr>
+      <tr><th>Id</th><th>Label</th><th>Source</th><th>Declared</th><th>Received</th><th>Control</th><th></th></tr>
     </thead>
     <tbody>
       {% for c in cameras %}{% set m = c.media %}{% set r = c.received %}
       <tr>
         <td><a href="/cameras/{{ c.id }}">{{ c.id }}</a></td>
         <td>{{ c.label }}</td>
-        <td class="mono">{{ m.srt_url }}</td>
+        <td>
+          {% if m.source == "media_server" %}via <a href="/media-servers/{{ m.media_server_id }}/media">{{ m.media_server_id }}</a> / {{ m.path or "?" }}
+          {% else %}direct · {{ m.mode }}{% if m.host or m.port %} {{ m.host or "" }}:{{ m.port or "" }}{% endif %}{% endif %}
+          {% if m.srt_url_overridden %}<span class="badge warn" title="computed: {{ m.srt_url_computed or 'none' }}">override</span>{% endif %}
+          <span class="sub mono">{{ m.srt_url }}</span>
+        </td>
         <td>
           {% if m.codec or m.width or m.fps %}
             {{ (m.codec or "")|upper }}

@@ -5,8 +5,9 @@ from typing import Annotated
 from fastapi import APIRouter, Form, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
-from osmiracore.api.deps import CollectorDep, SessionDep
-from osmiracore.services import media_servers
+from osmiracore.api.deps import BusDep, CollectorDep, SessionDep
+from osmiracore.models import MediaServer
+from osmiracore.services import cameras, media_servers, srt
 from osmiracore.services.errors import ConflictError, NotFoundError
 from osmiracore.web.forms import FormError, MediaServerForm
 from osmiracore.web.templating import TEMPLATES
@@ -46,6 +47,54 @@ def server_create(
     return _done()
 
 
+@router.post("/media-servers/detect")
+async def server_detect(request: Request, form: Annotated[MediaServerForm, Form()]) -> HTMLResponse:
+    """Detect button: read srtAddress in the MediaMTX configuration (htmx)."""
+    server = MediaServer(
+        id=form.id or "new",
+        api_url=form.api_url.strip().rstrip("/"),
+        api_username=form.api_username.strip() or None,
+        api_password=form.api_password or None,
+    )
+    found = await srt.exposed_media(request.app.state.http, server, [])
+    if found.srt_address_detected:
+        form.srt_address = found.srt_address_detected
+    message = (
+        f"detected in MediaMTX: {found.srt_address_detected}"
+        if found.srt_address_detected
+        else f"not detected ({found.error or 'SRT disabled in MediaMTX'})"
+    )
+    return TEMPLATES.TemplateResponse(
+        request,
+        "_srt_address.html",
+        {"form": form, "message": message, "ok": bool(found.srt_address_detected)},
+    )
+
+
+@router.get("/media-servers/{server_id}/media")
+async def server_media(request: Request, session: SessionDep, server_id: str) -> HTMLResponse:
+    """Media exposed by the server, read live from MediaMTX."""
+    server = media_servers.get_server(session, server_id)
+    found = await srt.exposed_media(
+        request.app.state.http, server, cameras.cameras_of_server(session, server_id)
+    )
+    return TEMPLATES.TemplateResponse(
+        request, "media_exposed.html", {"active": "media", "server": server, "found": found}
+    )
+
+
+@router.get("/media-servers/{server_id}/path-options")
+async def server_path_options(
+    request: Request, session: SessionDep, server_id: str
+) -> HTMLResponse:
+    """<datalist> of the exposed paths, for the camera form (htmx)."""
+    server = media_servers.get_server(session, server_id)
+    found = await srt.exposed_media(
+        request.app.state.http, server, cameras.cameras_of_server(session, server_id)
+    )
+    return TEMPLATES.TemplateResponse(request, "_path_options.html", {"found": found})
+
+
 @router.get("/media-servers/{server_id}")
 def server_edit(request: Request, session: SessionDep, server_id: str) -> HTMLResponse:
     server = media_servers.get_server(session, server_id)
@@ -61,21 +110,34 @@ def server_edit(request: Request, session: SessionDep, server_id: str) -> HTMLRe
 def server_update(
     request: Request,
     session: SessionDep,
+    bus: BusDep,
     server_id: str,
     form: Annotated[MediaServerForm, Form()],
 ) -> Response:
     form.id = server_id
     try:
         media_servers.update_server(session, server_id, form.to_update())
-    except (FormError, NotFoundError) as exc:
+    except (FormError, NotFoundError, ConflictError) as exc:
         session.rollback()
         return _form(request, form, is_new=False, errors=_messages(exc))
+    bus.sync(session)  # a new SRT address changes the URL of its cameras
     return _done()
 
 
 @router.post("/media-servers/{server_id}/delete")
-def server_delete(session: SessionDep, server_id: str) -> RedirectResponse:
-    media_servers.delete_server(session, server_id)
+def server_delete(request: Request, session: SessionDep, server_id: str) -> Response:
+    try:
+        media_servers.delete_server(session, server_id)
+    except ConflictError as exc:
+        session.rollback()
+        server = media_servers.get_server(session, server_id)
+        return _form(
+            request,
+            MediaServerForm.from_server(server),
+            is_new=False,
+            password_set=bool(server.api_password),
+            errors=[str(exc)],
+        )
     return _done()
 
 

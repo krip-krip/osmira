@@ -5,6 +5,7 @@ import pytest
 CAMERA_FORM = {
     "id": "cam1",
     "label": "CAM 1",
+    "source": "direct",  # with an imposed URL below
     "srt_url": "srt://192.168.104.253:8890?mode=caller&streamid=read:cam1",
     "latency_ms": "20",
     "codec": "hevc",

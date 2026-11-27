@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{{ server.id }} · exposed media{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="/media-servers">Media servers</a> / <a href="/media-servers/{{ server.id }}">{{ server.id }}</a> /</p>
+<div class="title-row">
+  <h1>{{ server.label }}: exposed media</h1>
+  <a class="button" href="/media-servers/{{ server.id }}/media">Refresh</a>
+</div>
+<p class="hint">Read live from <code>{{ server.api_url }}</code>. Stations read these paths at
+  <code>srt://{{ server.srt_address }}</code>.
+  {% if found.srt_address_detected and found.srt_address_detected != server.srt_address %}
+    <span class="warn">MediaMTX announces SRT on {{ found.srt_address_detected }}.</span>
+  {% endif %}
+</p>
+{% if not found.reachable %}
+  <p class="error" role="alert">{{ server.id }} unreachable: {{ found.error }}</p>
+{% elif not found.paths %}
+  <p class="empty">No path on this server.</p>
+{% else %}
+<div class="scroll">
+  <table class="list">
+    <thead><tr><th>Path</th><th>State</th><th>Source</th><th>Video</th><th>Readers</th><th>Cameras</th><th></th></tr></thead>
+    <tbody>
+      {% for p in found.paths %}
+      <tr>
+        <td class="mono">{{ p.name }}</td>
+        <td>{% if p.ready %}<span class="dot online" aria-hidden="true"></span> ready{% else %}<span class="dot offline" aria-hidden="true"></span> <span class="muted">not ready</span>{% endif %}</td>
+        <td>{{ p.source_type or "–" }}</td>
+        <td>{% if p.codec %}{{ p.codec|upper }}{% if p.width %} {{ p.width }}x{{ p.height }}{% endif %}{% else %}<span class="muted">–</span>{% endif %}</td>
+        <td>{{ p.readers }}</td>
+        <td>{% for c in p.cameras %}<a href="/cameras/{{ c }}">{{ c }}</a>{% if not loop.last %}, {% endif %}{% else %}<span class="muted">–</span>{% endfor %}</td>
+        <td class="actions">
+          {% if not p.cameras %}<a href="/cameras/new?source=media_server&amp;media_server_id={{ server.id }}&amp;path={{ p.name|urlencode }}&amp;id={{ p.name|urlencode }}&amp;label={{ p.name|upper|urlencode }}">Create camera</a>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

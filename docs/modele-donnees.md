@@ -29,7 +29,11 @@ Une caméra = un bloc **média** (comment recevoir l'image) + un bloc
 | `id` | texte | `cam1` | identifiant fixe |
 | `label` | texte | `CAM 1` | nom affiché (UMD par défaut) |
 | **média** | | | |
-| `media.srt_url` | texte | `srt://192.168.104.253:8890?mode=caller&streamid=read:cam1` | sans `latency=` |
+| `media.source` | `media_server` \| `direct` | `media_server` | d'où vient l'image (ADR 0011) |
+| `media.media_server_id`, `media.path` | texte | `mtx`, `cam1` | source `media_server` |
+| `media.mode` | `caller` \| `listener` | `caller` | source `direct` : rôle du poste |
+| `media.host`, `media.port` | texte, entier | `192.168.105.51`, `2020` | source `direct` (hôte facultatif en listener) |
+| `media.srt_url` | texte | `srt://192.168.104.253:8890?mode=caller&streamid=read:cam1` | URL **effective** : calculée, ou imposée (override) ; sans `latency=` |
 | `media.latency_ms` | entier | `20` | en **millisecondes** |
 | `media.codec` | `hevc` \| `h264` \| vide | vide | vide = auto |
 | `media.width` / `media.height` | entier \| vide | vide | vide = auto |
@@ -104,8 +108,9 @@ si la sortie n'existe plus.
 
 ## MediaServer (serveur média) et SrtSample — ADR 0010
 
-- **MediaServer** : `id`, `label`, `api_url`, `api_username`, `api_password`
-  (écriture seule), `enabled`.
+- **MediaServer** : `id`, `label`, `api_url`, `srt_address` (hôte:port que les
+  postes appellent, ADR 0011), `api_username`, `api_password` (écriture
+  seule), `enabled`. Non supprimable tant que des caméras l'utilisent.
 - **SrtSample** : un relevé par liaison toutes les 5 s, gardé 7 jours : `ts`,
   `server_id`, `link` (`camera` | `station`), `path`, `camera_id`, `station_id`,
   `connection_id`, `remote_addr`, `rtt_ms`, `mbps`, `link_capacity_mbps`,
