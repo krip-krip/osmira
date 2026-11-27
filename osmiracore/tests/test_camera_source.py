@@ -327,3 +327,14 @@ def test_deleting_a_used_server_from_the_page_explains_why(client, mtx):
 
     assert response.status_code == 422
     assert "used by cameras cam1" in response.text
+
+
+def test_path_list_loader_has_its_own_target(client, mtx):
+    """htmx attributes are inherited: without its own target, the path list
+    would replace the whole Source block (seen in a real browser)."""
+    page = client.get("/cameras/new").text
+    loader = page[
+        page.index('id="path-options"') : page.index("</span>", page.index('id="path-options"'))
+    ]
+
+    assert 'hx-target="this"' in loader
