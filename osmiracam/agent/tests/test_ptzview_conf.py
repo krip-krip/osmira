@@ -48,7 +48,9 @@ def test_general_section(settings):
 
     general = parse(render(config, settings.ptzview))["general"]
 
-    assert general["srt_latency_ms"] == "40"  # one latency for all: the largest
+    assert general["srt_latency_ms"] == "20"  # fixed default: latency is per input
+    conf = parse(render(config, settings.ptzview))
+    assert (conf["cam1"]["latency_ms"], conf["cam2"]["latency_ms"]) == ("20", "40")
     assert general["http_port"] == "8081"
     assert general["hdmi_mode"] == "1920x1080@50"
 

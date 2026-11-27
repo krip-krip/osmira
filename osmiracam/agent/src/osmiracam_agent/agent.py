@@ -132,9 +132,9 @@ class Agent:
         after = ptzview_conf.slot_inputs(config, ptz.slots, assignment, tag)
         try:
             for slot, (old, new) in enumerate(zip(before, after, strict=True), start=1):
-                if new[0] != old[0]:
-                    await self._ptzview.set_input(slot, new[0])
-                    log.info("input %d: %s", slot, new[0] or "disabled")
+                if (new[0], new[2]) != (old[0], old[2]):
+                    await self._ptzview.set_input(slot, new[0], new[2])
+                    log.info("input %d: %s (%d ms)", slot, new[0] or "disabled", new[2])
                 if new[1] != old[1]:
                     await self._ptzview.set_label(slot, new[1])
         except PtzviewUnavailable as exc:

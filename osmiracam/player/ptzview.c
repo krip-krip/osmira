@@ -76,6 +76,7 @@ static const char *state_name[] = { "connecting", "connected", "streaming", "wai
 struct cam {
     int idx;
     char url[512];
+    int latency_ms;           /* SRT latency of this input, -1: [general] value */
     /* protégé par g.lock */
     char label[LABEL_MAX];
     tally_t tally;
@@ -288,6 +289,7 @@ static void config_defaults(void)
                  "srt://192.168.104.253:8890?mode=caller&streamid=read:cam%d", i + 1);
         snprintf(cm->label, sizeof cm->label, "CAM %d", i + 1);
         cm->tally = TALLY_OFF;
+        cm->latency_ms = -1;
     }
 }
 
@@ -369,6 +371,8 @@ static int load_config(const char *path)
             struct cam *c = &g.cam[sect[3] - '1'];
             if (!strcmp(k, "url"))
                 snprintf(c->url, sizeof c->url, "%s", v);
+            else if (!strcmp(k, "latency_ms"))
+                c->latency_ms = *v ? atoi(v) : -1;
             else if (!strcmp(k, "label"))
                 clean_label(c->label, v);
             else if (!strcmp(k, "tally")) {
@@ -516,6 +520,7 @@ static void *cam_thread(void *arg)
         char url[sizeof c->url];
         pthread_mutex_lock(&g.lock);
         snprintf(url, sizeof url, "%s", c->url);
+        int latency_ms = c->latency_ms >= 0 ? c->latency_ms : g.cfg.srt_latency_ms;
         c->reload = 0;
         pthread_mutex_unlock(&g.lock);
         if (!url[0]) {
@@ -537,7 +542,7 @@ static void *cam_thread(void *arg)
         fmt->flags |= AVFMT_FLAG_NOBUFFER;
         fmt->probesize = 128 * 1024;
         /* options SRT de FFmpeg : latency en MICROsecondes, connect_timeout en ms */
-        av_dict_set_int(&opt, "latency", (int64_t)g.cfg.srt_latency_ms * 1000, 0);
+        av_dict_set_int(&opt, "latency", (int64_t)latency_ms * 1000, 0);
         av_dict_set_int(&opt, "connect_timeout", g.cfg.connect_timeout_ms, 0);
         av_dict_set(&opt, "transtype", "live", 0);
 
@@ -554,7 +559,7 @@ static void *cam_thread(void *arg)
         c->connects++;
         pthread_cond_broadcast(&g.cond);
         pthread_mutex_unlock(&g.lock);
-        logm("cam%d : connecté (%s)", c->idx + 1, url);
+        logm("cam%d : connecté (%s, latence %d ms)", c->idx + 1, url, latency_ms);
         c->prev_err[0] = 0;
 
         int64_t win_start = now_us();
@@ -1452,6 +1457,8 @@ static char *status_json(void)
                    t - c->last_frame_us < (int64_t)g.cfg.stall_timeout_ms * 1000;
         sb_printf(&s, "%s{\"cam\":%d,\"url\":", i ? "," : "", i + 1);
         sb_json_str(&s, c->url);
+        sb_printf(&s, ",\"latency_ms\":%d",
+                  c->latency_ms >= 0 ? c->latency_ms : g.cfg.srt_latency_ms);
         sb_printf(&s, ",\"label\":");
         sb_json_str(&s, c->label);
         sb_printf(&s, ",\"tally\":\"%s\",\"state\":\"%s\",\"connected\":%s,\"signal\":%s,"
@@ -1500,6 +1507,35 @@ static void url_decode_form(char *s)
         if (*p == '+')
             *p = ' ';
     MHD_http_unescape(s);
+}
+
+/* Value of a form field: query string first, then an url-encoded body. */
+static bool form_value(struct MHD_Connection *conn, const struct req *rq, const char *key,
+                       char *out, size_t size)
+{
+    const char *q = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, key);
+    if (q) {
+        snprintf(out, size, "%s", q);
+        return true;
+    }
+    size_t klen = strlen(key);
+    for (const char *p = rq->body; *p;) {
+        const char *end = strchr(p, '&');
+        size_t flen = end ? (size_t)(end - p) : strlen(p);
+        if (flen > klen && !strncmp(p, key, klen) && p[klen] == '=') {
+            size_t vlen = flen - klen - 1;
+            if (vlen >= size)
+                vlen = size - 1;
+            memcpy(out, p + klen + 1, vlen);
+            out[vlen] = 0;
+            url_decode_form(out);
+            return true;
+        }
+        if (!end)
+            break;
+        p = end + 1;
+    }
+    return false;
 }
 
 static enum MHD_Result http_cb(void *cls, struct MHD_Connection *conn, const char *url,
@@ -1580,25 +1616,31 @@ static enum MHD_Result http_cb(void *cls, struct MHD_Connection *conn, const cha
     }
 
     if (sscanf(url, "/input/%d%n", &n, &len) == 1 && !url[len]) {
-        /* New SRT URL for one input, applied without disturbing the others;
-           an empty URL disables the input. GET ?url=... or body url=... */
+        /* Change one input without disturbing the others: new SRT URL (empty:
+           input disabled) and/or SRT latency. Only this input reconnects.
+           GET ?url=...&latency_ms=... or form body url=...&latency_ms=... */
         if (n < 1 || n > NCAM)
             return reply(conn, 400, error_json("caméra 1 à 4"));
-        char newurl[sizeof g.cam[0].url];
-        const char *q = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "url");
-        if (q)
-            snprintf(newurl, sizeof newurl, "%s", q);
-        else if (!strncmp(rq->body, "url=", 4)) {
-            snprintf(newurl, sizeof newurl, "%s", rq->body + 4);
-            url_decode_form(newurl);
-        } else
-            return reply(conn, 400, error_json("url manquante (?url=... ou corps url=...)"));
+        char newurl[sizeof g.cam[0].url], lat[16];
+        bool has_url = form_value(conn, rq, "url", newurl, sizeof newurl);
+        bool has_lat = form_value(conn, rq, "latency_ms", lat, sizeof lat);
+        if (!has_url && !has_lat)
+            return reply(conn, 400, error_json("url et/ou latency_ms manquants"));
+        int newlat = has_lat && lat[0] ? atoi(lat) : -1;
+        if (has_lat && (newlat < -1 || newlat > 10000))
+            return reply(conn, 400, error_json("latency_ms : 0 à 10000"));
         struct cam *c = &g.cam[n - 1];
         pthread_mutex_lock(&g.lock);
-        if (strcmp(c->url, newurl)) {
+        if (has_url && strcmp(c->url, newurl)) {
             snprintf(c->url, sizeof c->url, "%s", newurl);
             c->reload = 1;
             logm("cam%d : URL changée (%s)", n, newurl[0] ? newurl : "entrée désactivée");
+        }
+        if (has_lat && c->latency_ms != newlat) {
+            c->latency_ms = newlat;
+            c->reload = 1;
+            logm("cam%d : latence changée (%d ms)", n,
+                 newlat >= 0 ? newlat : g.cfg.srt_latency_ms);
         }
         pthread_cond_broadcast(&g.cond);
         pthread_mutex_unlock(&g.lock);
