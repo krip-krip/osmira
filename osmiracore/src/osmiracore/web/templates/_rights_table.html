@@ -1,0 +1,38 @@
+<div id="rights">
+  <p class="capacity">
+    Decoding <strong>{{ decoding }}</strong> of {{ station.max_decoders }}
+    {% if decoding >= station.max_decoders %}<span class="muted">(full)</span>{% endif %}
+  </p>
+  {% include "_errors.html" %}
+  {% if not rows %}
+    <p class="empty">No camera yet. <a href="/cameras/new">Create one</a>.</p>
+  {% else %}
+  <div class="scroll">
+    <table class="list rights">
+      <thead>
+        <tr><th>Camera</th><th>Position</th><th>Decode</th><th>View</th><th>Control</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}{% set c = row.camera %}{% set f = row.form %}
+        <tr class="{{ 'on' if row.exists else 'off' }}{% if saved == c.id %} saved{% endif %}">
+          <td><strong>{{ c.label }}</strong> <span class="muted">{{ c.id }}</span></td>
+          <td><input name="position" type="number" min="1" value="{{ f.position }}" class="narrow" aria-label="position of {{ c.id }}"></td>
+          <td><input type="checkbox" name="decode" {% if f.decode %}checked{% endif %} aria-label="decode {{ c.id }}"></td>
+          <td><input type="checkbox" name="view" {% if f.view %}checked{% endif %} aria-label="view {{ c.id }}"></td>
+          <td><input type="checkbox" name="control" {% if f.control %}checked{% endif %} aria-label="control {{ c.id }}"></td>
+          <td class="actions">
+            <button hx-post="/stations/{{ station.id }}/rights/{{ c.id }}" hx-include="closest tr"
+                    hx-target="#rights" hx-swap="outerHTML">{{ "Save" if row.exists else "Add" }}</button>
+            {% if row.exists %}
+            <button class="danger" hx-post="/stations/{{ station.id }}/rights/{{ c.id }}/delete"
+                    hx-target="#rights" hx-swap="outerHTML"
+                    hx-confirm="Remove {{ c.id }} from {{ station.label }}?">Remove</button>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>

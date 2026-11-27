@@ -3,9 +3,8 @@
   {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
   {% if not matrix.sources or not matrix.destinations %}
     <p class="empty">
-      {% if not matrix.sources %}No camera yet.{% endif %}
-      {% if not matrix.destinations %}No station yet.{% endif %}
-      Create them through the <a href="/docs">API</a> for now.
+      {% if not matrix.sources %}No camera yet: <a href="/cameras/new">create one</a>.{% endif %}
+      {% if not matrix.destinations %}No station yet: <a href="/stations/new">create one</a>.{% endif %}
     </p>
   {% else %}
   <div class="scroll">

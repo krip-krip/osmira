@@ -39,8 +39,8 @@ def test_static_files_are_served(client):
 def test_empty_matrix_explains_what_to_do(client):
     page = client.get("/matrix").text
 
-    assert "No camera yet." in page
-    assert "No station yet." in page
+    assert "No camera yet" in page and "/cameras/new" in page
+    assert "No station yet" in page and "/stations/new" in page
 
 
 def test_matrix_shows_sources_and_destinations(setup):

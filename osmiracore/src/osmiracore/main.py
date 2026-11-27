@@ -18,6 +18,7 @@ from osmiracore.db import init_db, make_engine
 from osmiracore.services.errors import ConflictError, NotFoundError
 from osmiracore.services.events import EventBus
 from osmiracore.settings import Settings, load_settings
+from osmiracore.web import admin
 from osmiracore.web import routes as web
 
 
@@ -55,6 +56,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(stations.router)
     app.include_router(matrix.router)
     app.include_router(web.router)
+    app.include_router(admin.router)
     app.mount("/static", StaticFiles(directory=web.STATIC_DIR), name="static")
     return app
 
