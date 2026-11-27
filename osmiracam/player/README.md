@@ -73,7 +73,11 @@ Changer une entrée à chaud (sans toucher aux autres ni à l'image à l'écran)
 ```
 curl --data-urlencode 'url=srt://192.168.104.253:8890?mode=caller&streamid=read:cam5' $P/input/3
 curl --data 'url=' $P/input/3          # URL vide : entrée désactivée (aucune connexion)
+curl --data 'latency_ms=40' $P/input/3 # latence SRT de cette entrée seulement
 ```
+
+Chaque entrée a sa latence SRT (`latency_ms` dans `[camN]`, sinon
+`srt_latency_ms` de `[general]`) ; la changer ne reconnecte que cette entrée.
 
 Une entrée sans URL (`url =` vide dans la configuration) est désactivée :
 état `disabled`, NO SIGNAL si elle est affichée.
@@ -105,7 +109,7 @@ configuration (retour aux valeurs du fichier au prochain lancement).
 
 ## 5. Configuration (`ptzview.conf`)
 
-- `srt_latency_ms` : en **millisecondes** (converti pour FFmpeg, qui attend des µs).
+- `srt_latency_ms` : latence par défaut des entrées (`latency_ms` dans `[camN]` la remplace), en **millisecondes** (converti pour FFmpeg, qui attend des µs).
   Ne pas mettre `latency=` dans les URL. Côté MediaMTX : `srtMinLatency: 20ms`.
 - `hdmi_mode` : `1920x1080@50`, un numéro de mode, ou `auto`. 50 Hz conseillé
   aussi pour les flux 25p (moins d'attente du vblank).

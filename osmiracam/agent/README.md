@@ -47,7 +47,8 @@ retirée libère la sienne (désactivée, aucune tentative de connexion), une
 nouvelle prend une entrée libre. À un changement de configuration, l'agent
 ne met à jour que les entrées modifiées (`/input/N`, `/label/N`) : l'image à
 l'écran n'est pas coupée. `ptzview` n'est relancé que si un réglage global
-change (latence SRT, réglages `[ptzview.general]`).
+change dans `agent.toml` (`[ptzview.general]`). La latence SRT est propre à
+chaque entrée : la changer dans le Core ne reconnecte que l'entrée concernée.
 
 ## Limite actuelle de ptzview
 

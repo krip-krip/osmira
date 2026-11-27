@@ -32,9 +32,10 @@ class PtzviewClient:
         except (httpx2.HTTPError, ValueError) as exc:
             raise PtzviewUnavailable(repr(exc)) from exc
 
-    async def set_input(self, slot: int, url: str) -> None:
-        """New SRT URL for one input, without disturbing the others ("" disables it)."""
-        await self._post(f"/input/{slot}", {"url": url})
+    async def set_input(self, slot: int, url: str, latency_ms: int) -> None:
+        """New SRT URL ("" disables the input) and latency for one input; only
+        that input reconnects, the others are not disturbed."""
+        await self._post(f"/input/{slot}", {"url": url, "latency_ms": str(latency_ms)})
 
     async def set_label(self, slot: int, label: str) -> None:
         await self._post(f"/label/{slot}", {"text": label})

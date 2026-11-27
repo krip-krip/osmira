@@ -64,15 +64,16 @@ def slot_inputs(
     slots: int,
     assignment: Assignment | None = None,
     tag_station: bool = True,
-) -> list[tuple[str, str]]:
-    """(url, label) of each input, as ptzview must have them."""
+) -> list[tuple[str, str, int]]:
+    """(url, label, SRT latency in ms) of each input, as ptzview must have them.
+    Each input has its own latency: changing it only reconnects that input."""
     inputs = []
     for camera in slot_cameras(config, slots, assignment):
         if camera is None:
-            inputs.append((UNUSED_SLOT_URL, ""))
+            inputs.append((UNUSED_SLOT_URL, "", DEFAULT_LATENCY_MS))
         else:
             url = tag_streamid(camera.srt_url, config.station_id) if tag_station else camera.srt_url
-            inputs.append((_one_line(url), _one_line(camera.label)))
+            inputs.append((_one_line(url), _one_line(camera.label), camera.latency_ms))
     return inputs
 
 
@@ -80,11 +81,9 @@ def general(
     config: StationConfig, settings: PtzviewSettings, assignment: Assignment | None = None
 ) -> list[str]:
     """[general] settings that need a restart of ptzview when they change
-    (start_camera excepted: it only matters at start)."""
-    used = [c for c in slot_cameras(config, settings.slots, assignment) if c is not None]
-    # ptzview has one SRT latency for all inputs: take the largest requested.
-    latency = max((c.latency_ms for c in used), default=DEFAULT_LATENCY_MS)
-    lines = [f"srt_latency_ms = {latency}", f"http_port = {settings.http_port}"]
+    (start_camera excepted: it only matters at start). The SRT latency is per
+    input ([camN] latency_ms): the general value is only a fixed default."""
+    lines = [f"srt_latency_ms = {DEFAULT_LATENCY_MS}", f"http_port = {settings.http_port}"]
     lines += [f"{key} = {_one_line(value)}" for key, value in sorted(settings.general.items())]
     return lines
 
@@ -137,8 +136,9 @@ def render(
         f"start_camera = {display_slot(config, settings.slots, selected, assignment)}",
     ]
     inputs = slot_inputs(config, settings.slots, assignment, tag_station)
-    for index, (url, label) in enumerate(inputs, start=1):
-        lines += ["", f"[cam{index}]", f"url = {url}", f"label = {label}", "tally = off"]
+    for index, (url, label, latency) in enumerate(inputs, start=1):
+        lines += ["", f"[cam{index}]", f"url = {url}", f"latency_ms = {latency}"]
+        lines += [f"label = {label}", "tally = off"]
     return "\n".join(lines) + "\n"
 
 
