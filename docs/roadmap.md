@@ -40,6 +40,8 @@ affichée depuis le Core. Pas de pilotage PTZ à cette étape.
   reconnus par leur streamid, codec des caméras (ADR 0010).
 - [x] Historique des liaisons (paires de bouts, liaisons directes par les
   relevés des postes) et page Links (période, tableau, courbes uPlot).
+- [x] Mesures système de chaque poste (CPU, température, alimentation, RAM,
+  CMA, réseau, processus) et page par station avec courbes.
 - [ ] Sessions de mesure (protégées de la purge) et export CSV.
 - [ ] `ptzview` : publier les stats SRT côté réception (liaisons directes).
 - [x] `ptzview` : changement d'une entrée à chaud (`/input/N`), entrées
