@@ -21,6 +21,7 @@ from typing import Any
 
 from osmiracam_agent import __version__, ptzview_conf, station_info
 from osmiracam_agent.core_client import CoreClient, CoreEvent, CoreUnavailable
+from osmiracam_agent.metrics import SystemMetrics, throttled_flags
 from osmiracam_agent.ptzview_client import PtzviewClient, PtzviewUnavailable
 from osmiracam_agent.settings import Settings
 from osmiracam_agent.station_config import ConfigStore, SelectionStore, SlotsStore, StationConfig
@@ -52,6 +53,7 @@ class Agent:
         self._selection_store = selection_store
         self._hardware = hardware if hardware is not None else station_info.hardware()
         self._status_error: str | None = None
+        self._metrics = SystemMetrics()
         self._refresh_lock = asyncio.Lock()
         self._select_task: asyncio.Task[None] | None = None
         self._core_reachable: bool | None = None
@@ -269,7 +271,9 @@ class Agent:
                 }
             )
         player["cameras"] = cameras
+        metrics = await asyncio.to_thread(lambda: self._metrics.sample(throttled_flags()))
         return {
+            "metrics": metrics,
             "agent_version": __version__,
             "hostname": station_info.hostname(),
             "addresses": station_info.addresses(),

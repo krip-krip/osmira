@@ -266,6 +266,8 @@ class StationStatusIn(LenientModel):
     hardware: dict[str, Any] = Field(default_factory=dict)
     # Temperature, free memory, CMA, uptime...
     system: dict[str, Any] = Field(default_factory=dict)
+    # CPU, load, frequency, power flags, memory, CMA, disk, network, processes.
+    metrics: dict[str, Any] = Field(default_factory=dict)
 
 
 class StationStatusOut(StrictModel):
@@ -427,3 +429,25 @@ class LinkSeries(StrictModel):
     fps: list[float | None]
     station_mbps: list[float | None]
     decode_errors: list[int | None]
+
+
+class StationMetricsSeries(StrictModel):
+    """Curves of a station's system figures, in time buckets (None: no data)."""
+
+    station_id: str
+    bucket_s: float
+    t: list[float]
+    # cpu_pct, load1, cpu_mhz, temp_c, mem_available_mb (min), swap_used_mb,
+    # cma_free_mb (min), disk_used_pct, ptzview_cpu_pct, ptzview_rss_mb,
+    # agent_rss_mb, under_voltage (0/1), throttled (0/1: capped, throttled or
+    # temperature limit)
+    series: dict[str, list[float | None]]
+    # interface -> rx_mbps, tx_mbps, rx_dropped, errors
+    net: dict[str, dict[str, list[float | None]]]
+    # camera -> fps, decode_errors
+    cameras: dict[str, dict[str, list[float | None]]]
+    # Latest row (None if the station never sent figures) and its age.
+    latest: dict[str, Any] | None
+    # Over the period: cpu_max, temp_max, cma_free_min, mem_available_min,
+    # under_voltage_s, throttled_s, reboots, samples.
+    summary: dict[str, Any]

@@ -193,3 +193,34 @@ class StationSample(Base):
     decode_errors: Mapped[int | None]  # cumulative since the player started
     temp_c: Mapped[float | None]
     cma_free_mb: Mapped[float | None]
+
+
+class StationMetric(Base):
+    """System figures of a station, one row per status (every few seconds)."""
+
+    __tablename__ = "station_metrics"
+    __table_args__ = (Index("ix_station_metrics_station", "station_id", "ts"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    ts: Mapped[float]
+    station_id: Mapped[str]
+    cpu_pct: Mapped[float | None]
+    load1: Mapped[float | None]
+    cpu_mhz: Mapped[int | None]
+    temp_c: Mapped[float | None]
+    # Raspberry Pi flags: bit 0 under-voltage, 1 frequency capped, 2 throttled,
+    # 3 soft temperature limit (now); bits 16-19: the same since boot.
+    throttled: Mapped[int | None]
+    mem_total_mb: Mapped[int | None]
+    mem_available_mb: Mapped[int | None]
+    swap_used_mb: Mapped[int | None]
+    cma_total_mb: Mapped[int | None]
+    cma_free_mb: Mapped[int | None]
+    disk_used_pct: Mapped[float | None]
+    uptime_s: Mapped[int | None]
+    ptzview_cpu_pct: Mapped[float | None]
+    ptzview_rss_mb: Mapped[float | None]
+    agent_cpu_pct: Mapped[float | None]
+    agent_rss_mb: Mapped[float | None]
+    # Per interface: rx_mbps, tx_mbps, rx_dropped, errors (since the last row).
+    net: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)

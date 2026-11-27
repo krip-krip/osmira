@@ -2,11 +2,12 @@
 
 import time
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from osmiracore.models import Camera, Station, StationSample, StationStatus
+from osmiracore.models import Camera, Station, StationMetric, StationSample, StationStatus
 from osmiracore.schemas import ReceivedMedia, StationStatusIn, StationStatusOut
 from osmiracore.services import config, stations
 
@@ -22,6 +23,8 @@ def record_status(
     row.received_at = time.time() if now is None else now
     row.payload = data.model_dump()
     _store_samples(session, station_id, data, row.received_at)
+    if data.metrics:
+        _store_metrics(session, station_id, data.metrics, row.received_at)
     session.commit()
 
 
@@ -55,6 +58,39 @@ def _store_samples(session: Session, station_id: str, data: StationStatusIn, ts:
                 decode_errors=cam.decode_errors,
             )
         )
+
+
+def _store_metrics(session: Session, station_id: str, m: dict[str, Any], ts: float) -> None:
+    processes = m.get("processes") or {}
+    ptz = processes.get("ptzview") or {}
+    agent = processes.get("agent") or {}
+    session.add(
+        StationMetric(
+            ts=ts,
+            station_id=station_id,
+            cpu_pct=_float(m.get("cpu_pct")),
+            load1=_float(m.get("load1")),
+            cpu_mhz=_int(m.get("cpu_mhz")),
+            temp_c=_float(m.get("temp_c")),
+            throttled=_int(m.get("throttled")),
+            mem_total_mb=_int(m.get("mem_total_mb")),
+            mem_available_mb=_int(m.get("mem_available_mb")),
+            swap_used_mb=_int(m.get("swap_used_mb")),
+            cma_total_mb=_int(m.get("cma_total_mb")),
+            cma_free_mb=_int(m.get("cma_free_mb")),
+            disk_used_pct=_float(m.get("disk_used_pct")),
+            uptime_s=_int(m.get("uptime_s")),
+            ptzview_cpu_pct=_float(ptz.get("cpu_pct")),
+            ptzview_rss_mb=_float(ptz.get("rss_mb")),
+            agent_cpu_pct=_float(agent.get("cpu_pct")),
+            agent_rss_mb=_float(agent.get("rss_mb")),
+            net=m.get("net") if isinstance(m.get("net"), dict) else {},
+        )
+    )
+
+
+def _int(value: object) -> int | None:
+    return int(value) if isinstance(value, int | float) and not isinstance(value, bool) else None
 
 
 def _float(value: object) -> float | None:
