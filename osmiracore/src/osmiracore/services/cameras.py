@@ -11,6 +11,7 @@ from osmiracore.schemas import (
     ControlOut,
     Media,
     ReceivedMedia,
+    SourceMedia,
 )
 from osmiracore.services.errors import ConflictError, NotFoundError
 
@@ -18,10 +19,13 @@ from osmiracore.services.errors import ConflictError, NotFoundError
 FPS_TOLERANCE = 2.0
 
 
-def to_out(camera: Camera, received: ReceivedMedia | None = None) -> CameraOut:
+def to_out(
+    camera: Camera, received: ReceivedMedia | None = None, source: SourceMedia | None = None
+) -> CameraOut:
     """Public view of a camera: the password is never returned.
 
     `received`: what an online station currently receives (see services.status).
+    `source`: the stream as a media server sees it (see services.srt).
     """
     media = Media(
         srt_url=camera.media_srt_url,
@@ -36,7 +40,8 @@ def to_out(camera: Camera, received: ReceivedMedia | None = None) -> CameraOut:
         label=camera.label,
         media=media,
         received=received,
-        warnings=media_warnings(media, received),
+        source=source,
+        warnings=media_warnings(media, received, source),
         control=ControlOut(
             driver=camera.control_driver,
             host=camera.control_host,
@@ -48,11 +53,15 @@ def to_out(camera: Camera, received: ReceivedMedia | None = None) -> CameraOut:
     )
 
 
-def media_warnings(media: Media, received: ReceivedMedia | None) -> list[str]:
+def media_warnings(
+    media: Media, received: ReceivedMedia | None, source: SourceMedia | None = None
+) -> list[str]:
     """Declared values (not auto) that differ from the stream actually received."""
-    if received is None:
-        return []
     warnings = []
+    if media.codec and source and source.codec and media.codec != source.codec:
+        warnings.append(f"declared {media.codec}, media server has {source.codec}")
+    if received is None:
+        return warnings
     if media.width and media.height and received.width and received.height:
         if (media.width, media.height) != (received.width, received.height):
             warnings.append(

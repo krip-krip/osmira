@@ -34,6 +34,8 @@ class Settings:
     events_retry_s: float = 2.0
     # Seconds between two status reports to the Core (also the heartbeat).
     status_interval_s: float = 5.0
+    # Sign SRT connections with station=<id> in the MediaMTX streamid (ADR 0010).
+    tag_srt_streamid: bool = True
 
 
 def load_settings(path: Path) -> Settings:
@@ -66,4 +68,5 @@ def load_settings(path: Path) -> Settings:
         request_timeout_s=float(data.get("request_timeout_s", 5.0)),
         events_retry_s=float(data.get("events_retry_s", 2.0)),
         status_interval_s=float(data.get("status_interval_s", 5.0)),
+        tag_srt_streamid=bool(data.get("tag_srt_streamid", True)),
     )

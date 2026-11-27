@@ -13,6 +13,9 @@ poll_interval_s = 10
 request_timeout_s = 5
 # Seconds between two status reports (heartbeat) to the Core.
 status_interval_s = 5
+# Add station=<id> to the MediaMTX streamid of each SRT connection, so that
+# OsmiraCore can attribute SRT statistics to this station (ADR 0010).
+tag_srt_streamid = true
 
 [ptzview]
 binary = "../player/ptzview"

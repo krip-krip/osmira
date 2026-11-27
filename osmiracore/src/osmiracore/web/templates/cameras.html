@@ -27,10 +27,14 @@
           {% else %}<span class="muted">auto</span>{% endif %}
           <span class="sub">SRT {{ m.latency_ms }} ms</span>
         </td>
+        {% set src = c.source %}
         <td>
           {% if r %}
-            {% if r.width and r.height %}{{ r.width }}x{{ r.height }} · {% endif %}{{ "%.1f"|format(r.fps) }} fps
+            {% if src and src.codec %}{{ src.codec|upper }} {% endif %}{% if r.width and r.height %}{{ r.width }}x{{ r.height }} · {% endif %}{{ "%.1f"|format(r.fps) }} fps
             <span class="sub">via {{ r.station_id }}</span>
+          {% elif src %}
+            {{ (src.codec or "")|upper }} {% if src.width and src.height %}{{ src.width }}x{{ src.height }}{% endif %}
+            <span class="sub">{{ src.server_id }}/{{ src.path }}{% if not src.ready %} · not ready{% endif %}</span>
           {% else %}<span class="muted">–</span>{% endif %}
           {% for w in c.warnings %}<span class="warn sub">⚠ {{ w }}</span>{% endfor %}
         </td>

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from osmiracore.db import get_session
 from osmiracore.services.events import EventBus
+from osmiracore.services.srt import SrtCollector
 from osmiracore.settings import Settings
 
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -26,3 +27,10 @@ def get_settings(request: Request) -> Settings:
 
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
+
+
+def get_collector(request: Request) -> SrtCollector:
+    return request.app.state.srt_collector
+
+
+CollectorDep = Annotated[SrtCollector, Depends(get_collector)]

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}{{ "New media server" if is_new else form.id }}{% endblock %}
+{% block content %}
+<p class="crumbs"><a href="/media-servers">Media servers</a> /</p>
+<h1>{{ "New media server" if is_new else "Media server " ~ form.id }}</h1>
+{% include "_errors.html" %}
+<form method="post" class="form">
+  <fieldset>
+    <legend>MediaMTX</legend>
+    <label>Id
+      {% if is_new %}
+        <input name="id" value="{{ form.id }}" required pattern="[A-Za-z0-9_\-]{1,32}" placeholder="mediamtx1">
+      {% else %}
+        <input value="{{ form.id }}" disabled>
+      {% endif %}
+    </label>
+    <label>Label <input name="label" value="{{ form.label }}" required maxlength="64" placeholder="MediaMTX régie"></label>
+    <label class="wide">API URL
+      <input name="api_url" value="{{ form.api_url }}" required class="mono" placeholder="http://192.168.104.253:9997">
+      <small>The <code>apiAddress</code> of MediaMTX. Cameras whose SRT URL uses the same host are matched to its paths.</small>
+    </label>
+    <label>API username <input name="api_username" value="{{ form.api_username }}" autocomplete="off"></label>
+    <label>API password
+      <input name="api_password" type="password" autocomplete="new-password"
+             placeholder="{{ 'unchanged (set)' if password_set else 'not set' }}">
+      {% if password_set %}<span class="check"><input type="checkbox" name="clear_password"> clear the stored password</span>{% endif %}
+    </label>
+    <label>Collect statistics
+      <span class="check"><input type="checkbox" name="enabled" {% if form.enabled %}checked{% endif %}> enabled</span>
+    </label>
+  </fieldset>
+  <div class="buttons">
+    <button type="submit" class="primary">{{ "Create" if is_new else "Save" }}</button>
+    <a class="button" href="/media-servers">Cancel</a>
+  </div>
+</form>
+{% if not is_new %}
+<form method="post" action="/media-servers/{{ form.id }}/delete" class="danger-zone"
+      onsubmit="return confirm('Delete media server {{ form.id }}? Recorded statistics are kept.')">
+  <button type="submit" class="danger">Delete this media server</button>
+</form>
+{% endif %}
+{% endblock %}

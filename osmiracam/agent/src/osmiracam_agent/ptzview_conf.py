@@ -35,8 +35,43 @@ def display_slot(config: StationConfig, slots: int, camera_id: str | None) -> in
     return 1
 
 
-def render(config: StationConfig, settings: PtzviewSettings, selected: str | None = None) -> str:
-    """ptzview.conf text; ptzview starts on the `selected` camera if possible."""
+def tag_streamid(url: str, station_id: str) -> str:
+    """Add station=<id> to the MediaMTX streamid of an SRT URL.
+
+    MediaMTX shows it as the "query" of the connection, so OsmiraCore can tell
+    which station reads a stream even behind NAT (ADR 0010). Format:
+    read:<path>[:<user>:<pass>][:<query>]. Other URLs are left untouched.
+    """
+    base, sep, query = url.partition("?")
+    if not sep:
+        return url
+    parts = query.split("&")
+    for index, part in enumerate(parts):
+        if not part.startswith("streamid=read:"):
+            continue
+        value = part.removeprefix("streamid=")
+        fields = value.split(":")
+        tag = f"station={station_id}"
+        if len(fields) == 2:  # read:cam1
+            value += f":::{tag}"
+        elif len(fields) == 4:  # read:cam1:user:pass
+            value += f":{tag}"
+        elif len(fields) >= 5 and "station=" not in fields[4]:  # existing query
+            value += f"&{tag}"
+        parts[index] = f"streamid={value}"
+    return f"{base}?{'&'.join(parts)}"
+
+
+def render(
+    config: StationConfig,
+    settings: PtzviewSettings,
+    selected: str | None = None,
+    tag_station: bool = True,
+) -> str:
+    """ptzview.conf text; ptzview starts on the `selected` camera if possible.
+
+    tag_station: sign the SRT connections with the station id (tag_streamid).
+    """
     cameras = slot_cameras(config, settings.slots)
     used = [c for c in cameras if c is not None]
     # ptzview has one SRT latency for all inputs: take the largest requested.
@@ -59,7 +94,8 @@ def render(config: StationConfig, settings: PtzviewSettings, selected: str | Non
         if camera is None:
             lines += [f"url = {UNUSED_SLOT_URL}", "label = ", "tally = off"]
         else:
-            lines += [f"url = {_one_line(camera.srt_url)}", f"label = {_one_line(camera.label)}"]
+            url = tag_streamid(camera.srt_url, config.station_id) if tag_station else camera.srt_url
+            lines += [f"url = {_one_line(url)}", f"label = {_one_line(camera.label)}"]
             lines += ["tally = off"]
     return "\n".join(lines) + "\n"
 

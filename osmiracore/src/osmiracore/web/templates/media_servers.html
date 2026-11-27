@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Media servers{% endblock %}
+{% block content %}
+<div class="title-row">
+  <h1>Media servers</h1>
+  <a class="button primary" href="/media-servers/new">New media server</a>
+</div>
+<p class="hint">
+  MediaMTX servers whose API the Core reads every few seconds for SRT statistics
+  (camera → server and server → station links). Read only: nothing changes on
+  the server, and the picture never depends on it.
+</p>
+{% if not servers %}
+  <p class="empty">No media server yet.</p>
+{% else %}
+<div class="scroll">
+  <table class="list">
+    <thead><tr><th>Id</th><th>Label</th><th>API</th><th>State</th><th>MediaMTX</th><th>Paths</th><th></th></tr></thead>
+    <tbody>
+      {% for s in servers %}{% set st = s.state %}
+      <tr>
+        <td><a href="/media-servers/{{ s.id }}">{{ s.id }}</a></td>
+        <td>{{ s.label }}</td>
+        <td class="mono">{{ s.api_url }}</td>
+        <td>
+          {% if not s.enabled %}<span class="muted">disabled</span>
+          {% elif st.reachable is none %}<span class="muted">not polled yet</span>
+          {% elif st.reachable %}<span class="dot online" aria-hidden="true"></span> reachable
+          {% else %}<span class="dot offline" aria-hidden="true"></span> <span class="warn">unreachable</span>
+            <span class="sub warn">{{ st.last_error }}</span>{% endif %}
+          {% if st.last_ok %}<span class="sub">last answer {{ st.last_ok }}</span>{% endif %}
+        </td>
+        <td>{{ st.version or "–" }}</td>
+        <td>{{ st.paths }}</td>
+        <td class="actions"><a href="/media-servers/{{ s.id }}">Edit</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

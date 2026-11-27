@@ -1,6 +1,13 @@
+import pytest
 from conftest import core_config
 
-from osmiracam_agent.ptzview_conf import UNUSED_SLOT_URL, display_slot, render, slot_cameras
+from osmiracam_agent.ptzview_conf import (
+    UNUSED_SLOT_URL,
+    display_slot,
+    render,
+    slot_cameras,
+    tag_streamid,
+)
 from osmiracam_agent.station_config import StationConfig
 
 
@@ -26,9 +33,9 @@ def test_cameras_fill_slots_in_position_order(settings):
 
     conf = parse(render(config, settings.ptzview))
 
-    assert conf["cam1"]["url"].endswith("read:cam1")
+    assert conf["cam1"]["url"].endswith("read:cam1:::station=panelTest")
     assert conf["cam1"]["label"] == "CAM1"
-    assert conf["cam2"]["url"].endswith("read:cam3")
+    assert conf["cam2"]["url"].endswith("read:cam3:::station=panelTest")
     assert conf["cam3"]["url"] == UNUSED_SLOT_URL
     assert conf["cam4"]["url"] == UNUSED_SLOT_URL
     assert conf["cam4"]["label"] == ""
@@ -103,3 +110,38 @@ def test_start_on_the_selected_camera(settings):
     general = parse(render(config, settings.ptzview, selected="cam2"))["general"]
 
     assert general["start_camera"] == "2"
+
+
+@pytest.mark.parametrize(
+    ("url", "expected"),
+    [
+        (
+            "srt://m:8890?mode=caller&streamid=read:cam1",
+            "srt://m:8890?mode=caller&streamid=read:cam1:::station=s1",
+        ),
+        (
+            "srt://m:8890?streamid=read:cam1:user:pass&latency=20",
+            "srt://m:8890?streamid=read:cam1:user:pass:station=s1&latency=20",
+        ),
+        (
+            "srt://m:8890?streamid=read:cam1:::a=1",
+            "srt://m:8890?streamid=read:cam1:::a=1&station=s1",
+        ),
+        (
+            "srt://m:8890?streamid=read:cam1:::station=s1",
+            "srt://m:8890?streamid=read:cam1:::station=s1",
+        ),
+        ("srt://m:8890?streamid=publish:cam1", "srt://m:8890?streamid=publish:cam1"),
+        ("srt://m:8890", "srt://m:8890"),
+    ],
+)
+def test_tag_streamid(url, expected):
+    assert tag_streamid(url, "s1") == expected
+
+
+def test_tagging_can_be_disabled(settings):
+    config = StationConfig.from_json(core_config([("cam1", 1, True)]))
+
+    conf = parse(render(config, settings.ptzview, tag_station=False))
+
+    assert conf["cam1"]["url"].endswith("streamid=read:cam1")

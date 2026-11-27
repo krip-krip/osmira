@@ -10,10 +10,12 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
-from osmiracore.models import Camera, Right, Station
+from osmiracore.models import Camera, MediaServer, Right, Station
 from osmiracore.schemas import (
     CameraCreate,
     CameraUpdate,
+    MediaServerCreate,
+    MediaServerUpdate,
     RightIn,
     StationCreate,
     StationUpdate,
@@ -158,6 +160,42 @@ class RightForm(BaseModel):
                 "control": self.control,
             },
         )
+
+
+class MediaServerForm(BaseModel):
+    id: str = ""
+    label: str = ""
+    api_url: str = ""
+    api_username: str = ""
+    api_password: str = ""  # empty on edit: keep the stored password
+    clear_password: bool = False
+    enabled: bool = False  # unchecked box: not sent
+
+    @classmethod
+    def from_server(cls, server: MediaServer) -> "MediaServerForm":
+        return cls(
+            id=server.id,
+            label=server.label,
+            api_url=server.api_url,
+            api_username=server.api_username or "",
+            enabled=server.enabled,
+        )
+
+    def to_update(self) -> MediaServerUpdate:
+        return _validate(MediaServerUpdate, self._body())
+
+    def to_create(self) -> MediaServerCreate:
+        return _validate(MediaServerCreate, {"id": self.id.strip(), **self._body()})
+
+    def _body(self) -> dict[str, Any]:
+        password = "" if self.clear_password else (self.api_password or None)
+        return {
+            "label": self.label.strip(),
+            "api_url": self.api_url.strip(),
+            "api_username": self.api_username.strip() or None,
+            "api_password": password,
+            "enabled": self.enabled,
+        }
 
 
 def _text(value: int | None) -> str:

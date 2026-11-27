@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from sqlalchemy import JSON, ForeignKey, String, UniqueConstraint
+from sqlalchemy import JSON, ForeignKey, Index, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from osmiracore.db import Base
@@ -94,3 +94,53 @@ class StationStatus(Base):
     # Core clock, seconds since the epoch (UTC).
     received_at: Mapped[float]
     payload: Mapped[dict[str, Any]] = mapped_column(JSON)
+
+
+class MediaServer(Base):
+    """A MediaMTX server whose API the Core reads for SRT statistics (ADR 0010)."""
+
+    __tablename__ = "media_servers"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    label: Mapped[str]
+    # MediaMTX API, e.g. http://192.168.104.253:9997
+    api_url: Mapped[str]
+    api_username: Mapped[str | None]
+    api_password: Mapped[str | None]
+    enabled: Mapped[bool] = mapped_column(default=True)
+
+
+class SrtSample(Base):
+    """One reading of one SRT link, every few seconds (ADR 0010).
+
+    link = "camera": camera -> media server (the server receives);
+    link = "station": media server -> station (the server sends).
+    Counters are cumulative since the connection started, as MediaMTX gives
+    them; rates over an interval come from two consecutive samples.
+    """
+
+    __tablename__ = "srt_samples"
+    __table_args__ = (
+        Index("ix_srt_samples_ts", "ts"),
+        Index("ix_srt_samples_camera", "camera_id", "ts"),
+        Index("ix_srt_samples_station", "station_id", "ts"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    ts: Mapped[float]  # Core clock, seconds since the epoch (UTC)
+    server_id: Mapped[str]
+    link: Mapped[str]
+    path: Mapped[str]
+    # Not foreign keys: samples outlive the cameras and stations they describe.
+    camera_id: Mapped[str | None]
+    station_id: Mapped[str | None]
+    connection_id: Mapped[str | None]
+    remote_addr: Mapped[str | None]
+    rtt_ms: Mapped[float | None]
+    mbps: Mapped[float | None]  # receive rate (camera link) or send rate (station link)
+    link_capacity_mbps: Mapped[float | None]
+    packets: Mapped[int | None]  # received (camera link) or sent (station link)
+    packets_lost: Mapped[int | None]
+    packets_retrans: Mapped[int | None]
+    packets_dropped: Mapped[int | None]  # too late to be played: picture damage
+    buffer_ms: Mapped[float | None]

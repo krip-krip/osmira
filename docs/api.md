@@ -184,6 +184,29 @@ curl -N localhost:8000/api/stations/panelTest/events
   est-elle la version actuelle ?) et le dernier `status` reçu.
 - `GET /api/matrix` : chaque destination porte aussi `online`.
 
+### Serveurs média et statistiques SRT (ADR 0010)
+
+- `GET|POST /api/media-servers`, `GET|PUT|DELETE /api/media-servers/{id}` :
+  `{"id": "mtx", "label": "MediaMTX régie", "api_url": "http://192.168.104.253:9997",
+  "api_username": null, "api_password": null, "enabled": true}`. Mot de passe en
+  écriture seule (`password_set`). La lecture ajoute `state` : `reachable`,
+  `last_ok`, `last_error`, `version` de MediaMTX, nombre de chemins (`paths`).
+- `GET /api/srt/links` : liaisons vues dans les 15 dernières secondes.
+
+| Champ | Sens |
+|---|---|
+| `link` | `camera` (caméra → MediaMTX, côté récepteur) ou `station` (MediaMTX → poste, côté émetteur) |
+| `path`, `camera_id`, `station_id`, `remote_addr` | chemin MediaMTX, caméra et poste reconnus, adresse vue par MediaMTX |
+| `rtt_ms`, `mbps`, `link_capacity_mbps`, `buffer_ms` | valeurs instantanées |
+| `interval_s`, `loss_percent`, `retrans_per_s`, `dropped` | sur le dernier intervalle (≈ 5 s) |
+| `packets`, `packets_lost`, `packets_retrans`, `packets_dropped` | cumulés depuis le début de la connexion |
+
+- `GET /api/srt/samples?since=<ISO>&until=&camera_id=&station_id=&link=&limit=` :
+  relevés bruts (compteurs cumulés), du plus ancien au plus récent.
+- Les caméras ajoutent `source` : le flux tel que MediaMTX le voit (`server_id`,
+  `path`, `ready`, `codec`, `width`, `height`) ; un codec déclaré différent
+  donne un `warning`.
+
 ## Prévu (incréments suivants, à préciser le moment venu)
 
 - Événements `tally` (`{"camera_id", "tally"}`) et `umd`
