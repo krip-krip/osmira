@@ -28,12 +28,18 @@
     <label>SRT latency (ms) <input name="latency_ms" value="{{ form.latency_ms }}" type="number" min="0" max="10000"></label>
     <label>Codec
       <select name="codec">
+        <option value="" {% if not form.codec %}selected{% endif %}>Auto</option>
         {% for codec in ("hevc", "h264") %}<option value="{{ codec }}" {% if form.codec == codec %}selected{% endif %}>{{ codec|upper }}</option>{% endfor %}
       </select>
     </label>
-    <label>Width <input name="width" value="{{ form.width }}" type="number" min="1"></label>
-    <label>Height <input name="height" value="{{ form.height }}" type="number" min="1"></label>
-    <label>Frame rate <input name="fps" value="{{ form.fps }}" type="number" min="1" max="120"></label>
+    <label>Width <input name="width" value="{{ form.width }}" type="number" min="1" placeholder="auto"></label>
+    <label>Height <input name="height" value="{{ form.height }}" type="number" min="1" placeholder="auto"></label>
+    <label>Frame rate <input name="fps" value="{{ form.fps }}" type="number" min="1" max="120" placeholder="auto"></label>
+    <p class="note wide">
+      Codec, size and frame rate are optional: leave them on <em>auto</em> and the
+      Cameras page shows what the stations actually receive. A declared value
+      becomes an expectation: a different stream is flagged.
+    </p>
   </fieldset>
 
   <fieldset>

@@ -34,7 +34,8 @@ affichée depuis le Core. Pas de pilotage PTZ à cette étape.
 - [x] Interface web : pages caméras, stations, droits.
 - [x] État des postes : signal de vie de l'agent (versions, matériel, flux),
   en ligne / hors ligne dans les pages Stations et Matrice.
-- [ ] Paramètres média des caméras en « auto » (détection des flux réels).
+- [x] Paramètres média des caméras en « auto » (format reçu remonté par les
+  postes ; codec via MediaMTX avec les stats SRT).
 - [ ] Stats SRT : collecte MediaMTX, page Liaisons (courbes uPlot, sessions
   de mesure, export CSV).
 - [ ] `ptzview` : nombre de caméras configurable, rechargement de la config

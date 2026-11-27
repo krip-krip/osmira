@@ -53,8 +53,11 @@ def test_minimal_camera_uses_defaults(client):
 
     camera = client.post("/api/cameras", json=body).json()
 
-    assert camera["media"]["codec"] == "hevc"
-    assert camera["media"]["fps"] == 50
+    # Format not declared: auto (the stations play what they receive).
+    assert camera["media"]["codec"] is None
+    assert camera["media"]["width"] is None
+    assert camera["media"]["fps"] is None
+    assert camera["media"]["latency_ms"] == 20
     assert camera["control"]["driver"] == "none"
     assert camera["control"]["password_set"] is False
 

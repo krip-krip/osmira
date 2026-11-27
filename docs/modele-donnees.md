@@ -31,9 +31,9 @@ Une caméra = un bloc **média** (comment recevoir l'image) + un bloc
 | **média** | | | |
 | `media.srt_url` | texte | `srt://192.168.104.253:8890?mode=caller&streamid=read:cam1` | sans `latency=` |
 | `media.latency_ms` | entier | `20` | en **millisecondes** |
-| `media.codec` | `hevc` \| `h264` | `hevc` | |
-| `media.width` / `media.height` | entier | `1920` / `1080` | |
-| `media.fps` | entier | `50` | 25 ou 50 |
+| `media.codec` | `hevc` \| `h264` \| vide | vide | vide = auto |
+| `media.width` / `media.height` | entier \| vide | vide | vide = auto |
+| `media.fps` | entier \| vide | vide | vide = auto |
 | **contrôle** | | | |
 | `control.driver` | texte | `panasonic_aw` | nom du pilote de l'agent ; `none` = pas de pilotage |
 | `control.host` | texte | `192.168.105.51` | |
@@ -41,6 +41,11 @@ Une caméra = un bloc **média** (comment recevoir l'image) + un bloc
 | `control.username` | texte | `admin` | facultatif |
 | `control.password` | texte | — | facultatif, **jamais renvoyé** par l'API de gestion |
 | `control.options` | objet JSON | `{}` | paramètres propres au pilote |
+
+Codec, taille et cadence sont **facultatifs** (« auto ») : les postes jouent ce
+qu'ils reçoivent et le Core affiche le format **réellement reçu** (remonté par
+les postes en ligne). Une valeur déclarée devient une valeur attendue : un
+flux différent est signalé (`warnings`).
 
 Plus tard : `site_id`, et des adresses média/contrôle différentes selon le
 site du poste (un poste distant ne passe pas par le même MediaMTX).

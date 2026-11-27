@@ -4,23 +4,39 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from osmiracore.models import Camera
-from osmiracore.schemas import CameraCreate, CameraOut, CameraUpdate, ControlOut, Media
+from osmiracore.schemas import (
+    CameraCreate,
+    CameraOut,
+    CameraUpdate,
+    ControlOut,
+    Media,
+    ReceivedMedia,
+)
 from osmiracore.services.errors import ConflictError, NotFoundError
 
+# A stream announced at 50 i/s is measured between ~49 and ~51.
+FPS_TOLERANCE = 2.0
 
-def to_out(camera: Camera) -> CameraOut:
-    """Public view of a camera: the password is never returned."""
+
+def to_out(camera: Camera, received: ReceivedMedia | None = None) -> CameraOut:
+    """Public view of a camera: the password is never returned.
+
+    `received`: what an online station currently receives (see services.status).
+    """
+    media = Media(
+        srt_url=camera.media_srt_url,
+        latency_ms=camera.media_latency_ms,
+        codec=camera.media_codec,  # validated on write
+        width=camera.media_width,
+        height=camera.media_height,
+        fps=camera.media_fps,
+    )
     return CameraOut(
         id=camera.id,
         label=camera.label,
-        media=Media(
-            srt_url=camera.media_srt_url,
-            latency_ms=camera.media_latency_ms,
-            codec=camera.media_codec,  # validated on write
-            width=camera.media_width,
-            height=camera.media_height,
-            fps=camera.media_fps,
-        ),
+        media=media,
+        received=received,
+        warnings=media_warnings(media, received),
         control=ControlOut(
             driver=camera.control_driver,
             host=camera.control_host,
@@ -30,6 +46,22 @@ def to_out(camera: Camera) -> CameraOut:
             password_set=bool(camera.control_password),
         ),
     )
+
+
+def media_warnings(media: Media, received: ReceivedMedia | None) -> list[str]:
+    """Declared values (not auto) that differ from the stream actually received."""
+    if received is None:
+        return []
+    warnings = []
+    if media.width and media.height and received.width and received.height:
+        if (media.width, media.height) != (received.width, received.height):
+            warnings.append(
+                f"declared {media.width}x{media.height}, "
+                f"received {received.width}x{received.height}"
+            )
+    if media.fps and received.fps and abs(media.fps - received.fps) > FPS_TOLERANCE:
+        warnings.append(f"declared {media.fps} fps, received {received.fps:.1f} fps")
+    return warnings
 
 
 def list_cameras(session: Session) -> list[Camera]:

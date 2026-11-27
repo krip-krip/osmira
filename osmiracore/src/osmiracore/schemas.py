@@ -16,10 +16,23 @@ class StrictModel(BaseModel):
 class Media(StrictModel):
     srt_url: Annotated[str, Field(pattern=r"^srt://", max_length=500)]
     latency_ms: Annotated[int, Field(ge=0, le=10_000)] = 20
-    codec: Literal["hevc", "h264"] = "hevc"
-    width: Annotated[int, Field(gt=0, le=7680)] = 1920
-    height: Annotated[int, Field(gt=0, le=4320)] = 1080
-    fps: Annotated[int, Field(gt=0, le=120)] = 50
+    # Expected format. None = auto: nothing declared, the stations play what
+    # they receive and the Core shows what was actually received.
+    codec: Literal["hevc", "h264"] | None = None
+    width: Annotated[int, Field(gt=0, le=7680)] | None = None
+    height: Annotated[int, Field(gt=0, le=4320)] | None = None
+    fps: Annotated[int, Field(gt=0, le=120)] | None = None
+
+
+class ReceivedMedia(StrictModel):
+    """Format actually received by a station (from its status report)."""
+
+    station_id: str
+    width: int | None
+    height: int | None
+    fps: float | None
+    # Seconds since that station reported it.
+    seconds_since: float
 
 
 class ControlBase(StrictModel):
@@ -55,6 +68,10 @@ class CameraOut(StrictModel):
     label: str
     media: Media
     control: ControlOut
+    # What online stations actually receive (None: no station streams it now).
+    received: ReceivedMedia | None = None
+    # Declared values that differ from what is received.
+    warnings: list[str] = Field(default_factory=list)
 
 
 class StationUpdate(StrictModel):

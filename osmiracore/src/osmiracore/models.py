@@ -17,10 +17,11 @@ class Camera(Base):
     # Media block: how a station receives the picture.
     media_srt_url: Mapped[str]
     media_latency_ms: Mapped[int]
-    media_codec: Mapped[str]
-    media_width: Mapped[int]
-    media_height: Mapped[int]
-    media_fps: Mapped[int]
+    # Expected format; None = auto (not declared, the real stream is shown).
+    media_codec: Mapped[str | None]
+    media_width: Mapped[int | None]
+    media_height: Mapped[int | None]
+    media_fps: Mapped[int | None]
 
     # Control block: how a station drives the camera (directly, never via the Core).
     control_driver: Mapped[str]
