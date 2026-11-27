@@ -372,3 +372,58 @@ class ExposedMedia(StrictModel):
     # host:port read in the MediaMTX configuration (srtAddress).
     srt_address_detected: str | None
     paths: list[ExposedPath]
+
+
+LinkKind = Literal["camera_server", "server_station", "camera_station"]
+
+
+class LinkSummary(StrictModel):
+    """One link (pair of ends) over a period, all its connections together.
+
+    camera_server: camera -> media server (MediaMTX, receiver side);
+    server_station: media server -> station (MediaMTX sender side, plus what
+    the station reports); camera_station: direct, station reports only.
+    """
+
+    id: str
+    kind: LinkKind
+    camera_id: str | None
+    server_id: str | None
+    path: str | None
+    station_id: str | None
+    active: bool
+    first_seen: str
+    last_seen: str
+    duration_s: float
+    # SRT, from the media server (None for direct links).
+    connections: int | None
+    packets: int | None
+    packets_lost: int | None
+    packets_retrans: int | None
+    packets_dropped: int | None
+    loss_percent: float | None
+    rtt_avg_ms: float | None
+    rtt_max_ms: float | None
+    mbps_avg: float | None
+    # What the station reports (None for camera -> server links).
+    fps_avg: float | None
+    fps_min: float | None
+    no_picture_s: float | None
+    decode_errors: int | None
+    reconnects: int | None
+
+
+class LinkSeries(StrictModel):
+    """Time series of one link, in buckets (None: no data in the bucket)."""
+
+    id: str
+    bucket_s: float
+    t: list[float]  # bucket start, seconds since the epoch
+    rtt_ms: list[float | None]
+    mbps: list[float | None]
+    loss_percent: list[float | None]
+    retrans_per_s: list[float | None]
+    dropped: list[int | None]
+    fps: list[float | None]
+    station_mbps: list[float | None]
+    decode_errors: list[int | None]

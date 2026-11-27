@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from osmiracore.models import Station, StationStatus
+from osmiracore.models import Camera, Station, StationSample, StationStatus
 from osmiracore.schemas import ReceivedMedia, StationStatusIn, StationStatusOut
 from osmiracore.services import config, stations
 
@@ -21,7 +21,44 @@ def record_status(
         session.add(row)
     row.received_at = time.time() if now is None else now
     row.payload = data.model_dump()
+    _store_samples(session, station_id, data, row.received_at)
     session.commit()
+
+
+def _store_samples(session: Session, station_id: str, data: StationStatusIn, ts: float) -> None:
+    """One sample per received camera, plus one for the station itself."""
+    system = data.system
+    session.add(
+        StationSample(
+            ts=ts,
+            station_id=station_id,
+            camera_id=None,
+            temp_c=_float(system.get("temp_c")),
+            cma_free_mb=_float(system.get("cma_free_mb")),
+        )
+    )
+    for cam in data.player.cameras:
+        camera = session.get(Camera, cam.camera_id)
+        session.add(
+            StationSample(
+                ts=ts,
+                station_id=station_id,
+                camera_id=cam.camera_id,
+                via_server_id=camera.media_server_id if camera else None,
+                via_path=camera.media_path if camera else None,
+                state=cam.state,
+                fps=cam.fps,
+                mbps=cam.mbps,
+                width=cam.width,
+                height=cam.height,
+                connects=cam.connects,
+                decode_errors=cam.decode_errors,
+            )
+        )
+
+
+def _float(value: object) -> float | None:
+    return float(value) if isinstance(value, int | float) else None
 
 
 def station_status(
