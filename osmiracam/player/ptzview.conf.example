@@ -3,6 +3,9 @@
 # (pas de commentaire en fin de ligne).
 
 [general]
+# Nombre d'entrees (1 a 16) : une section [camN] par entree, N = 1..cameras.
+# Chaque entree decodee coute de la memoire (CMA : ~90 Mo par flux HEVC 1080p).
+cameras = 4
 # Latence SRT demandee, en MILLIsecondes (convertie en interne pour FFmpeg).
 # La latence effective = max(cette valeur, srtMinLatency de MediaMTX).
 srt_latency_ms = 20
@@ -42,6 +45,7 @@ rt_priority = 0
 # Journal FFmpeg : quiet, error, warning, info, verbose
 loglevel = error
 
+# Une section par entree (cam1 a camN, N = cameras).
 # Les URL sont sans latency= (elle vient de srt_latency_ms ci-dessus).
 [cam1]
 url = srt://192.168.104.253:8890?mode=caller&streamid=read:cam1

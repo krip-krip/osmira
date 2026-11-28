@@ -1,8 +1,9 @@
-# ptzview — lecteur 4 × SRT/HEVC pour Raspberry Pi 4 (maquette)
+# ptzview — lecteur multi-caméras SRT/HEVC (Raspberry Pi 4 et autres)
 
-Reçoit et décode en permanence les 4 caméras (HEVC matériel, `rpi-hevc-dec`), affiche
-la caméra choisie sur la sortie HDMI (DRM/KMS, sans GPU ni compositeur), dessine
-tally + UMD + NO SIGNAL sur un plan matériel séparé, et se pilote par HTTP.
+Reçoit et décode en permanence ses N caméras (réglage `cameras`, 4 par défaut ;
+HEVC matériel, `rpi-hevc-dec` sur Pi 4), affiche la caméra choisie sur la sortie
+HDMI (DRM/KMS, sans GPU ni compositeur), dessine tally + UMD + NO SIGNAL sur un
+plan matériel séparé, et se pilote par HTTP.
 
 ## 1. Installation (une fois)
 
@@ -131,6 +132,10 @@ configuration (retour aux valeurs du fichier au prochain lancement).
 
 ## 5. Configuration (`ptzview.conf`)
 
+- `cameras` : nombre d'entrées, de 1 à 16 (défaut 4), une section `[camN]` par
+  entrée. Seules ces entrées sont reçues et décodées ; la limite réelle dépend du
+  matériel (CMA, décodeur : 4 flux 1080p50 sur Pi 4). `/status` donne ce nombre
+  dans `inputs`, et les routes refusent un numéro hors de 1…`cameras`.
 - `srt_latency_ms` : latence par défaut des entrées (`latency_ms` dans `[camN]` la remplace), en **millisecondes** (converti pour FFmpeg, qui attend des µs).
   Ne pas mettre `latency=` dans les URL. Côté MediaMTX : `srtMinLatency: 20ms`.
 - `hdmi_mode` : `1920x1080@50`, un numéro de mode, ou `auto`. 50 Hz conseillé

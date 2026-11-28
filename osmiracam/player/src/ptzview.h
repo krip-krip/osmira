@@ -27,7 +27,8 @@
 #include <libavutil/hwcontext.h>
 #include <srt/srt.h>
 
-#define NCAM 4
+/* Size of the input table; the number used is the "cameras" setting. */
+#define MAX_CAMS 16
 #define LABEL_MAX 96
 
 /* ------------------------------------------------------------------ */
@@ -70,6 +71,7 @@ struct config {
     char hwaccel[32], hwaccel_device[128];
     int extra_hw_frames;
     char drm_device[64], connector[32], hdmi_mode[32], video_plane[16];
+    int cameras;              /* inputs used (1..MAX_CAMS) */
     int http_port, start_camera;
     char font[64];
     double umd_off_alpha;
@@ -79,10 +81,10 @@ struct config {
 
 struct state {
     struct config cfg;
-    struct cam cam[NCAM];
+    struct cam cam[MAX_CAMS];
     pthread_mutex_t lock;
     pthread_cond_t cond;
-    int selected;             /* 0..3 */
+    int selected;             /* 0..cfg.cameras-1 */
     int64_t switch_req_us;
     double last_switch_ms;
     volatile sig_atomic_t quit;

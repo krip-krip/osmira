@@ -1,6 +1,8 @@
 import socket
 from pathlib import Path
 
+import pytest
+
 from osmiracam_agent.settings import load_settings
 
 EXAMPLE = Path(__file__).parent.parent / "agent.toml.example"
@@ -32,3 +34,11 @@ def test_explicit_station_id_wins(tmp_path):
     (tmp_path / "agent.toml").write_text('core_url = "http://core"\nstation_id = "cam-op-1"\n')
 
     assert load_settings(tmp_path / "agent.toml").station_id == "cam-op-1"
+
+
+@pytest.mark.parametrize("slots", [0, 17])
+def test_slots_out_of_range_is_refused(tmp_path, slots):
+    (tmp_path / "agent.toml").write_text(f'core_url = "http://core"\n[ptzview]\nslots = {slots}\n')
+
+    with pytest.raises(ValueError, match="slots"):
+        load_settings(tmp_path / "agent.toml")

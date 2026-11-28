@@ -1,6 +1,7 @@
 """Generate ptzview.conf from the station configuration.
 
-ptzview has a fixed number of inputs (slots). Each camera keeps its input
+ptzview has a set number of inputs (slots in agent.toml, "cameras" in
+ptzview.conf). Each camera keeps its input
 while it stays in the configuration (assign_slots): adding, removing or
 changing a camera only touches its own input. A free input has no URL, so
 ptzview does not try to connect it (disabled, NO SIGNAL if shown).
@@ -83,7 +84,11 @@ def general(
     """[general] settings that need a restart of ptzview when they change
     (start_camera excepted: it only matters at start). The SRT latency is per
     input ([camN] latency_ms): the general value is only a fixed default."""
-    lines = [f"srt_latency_ms = {DEFAULT_LATENCY_MS}", f"http_port = {settings.http_port}"]
+    lines = [
+        f"cameras = {settings.slots}",
+        f"srt_latency_ms = {DEFAULT_LATENCY_MS}",
+        f"http_port = {settings.http_port}",
+    ]
     lines += [f"{key} = {_one_line(value)}" for key, value in sorted(settings.general.items())]
     return lines
 

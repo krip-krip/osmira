@@ -22,13 +22,14 @@ binary = "../player/ptzview"
 conf_path = "state/ptzview.conf"
 # Port 8080 is taken on panelTest (see docs/environnement-de-test.md).
 http_port = 8081
-# Number of ptzview inputs (fixed at 4 in ptzview today).
+# Number of ptzview inputs, 1 to 16 ("cameras" in ptzview.conf). Each one is
+# decoded all the time: 4 HEVC 1080p50 streams at most on a Pi 4.
 slots = 4
 stop_timeout_s = 5
 restart_delay_s = 2
 
 # Copied as-is into [general] of ptzview.conf (see ptzview.conf.example).
-# Do not set srt_latency_ms, http_port or start_camera here: the agent does.
+# Do not set cameras, srt_latency_ms, http_port or start_camera here: the agent does.
 [ptzview.general]
 connect_timeout_ms = 1500
 stall_timeout_ms = 1000

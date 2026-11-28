@@ -16,11 +16,12 @@ static char *status_json(void)
     struct sbuf s = { 0 };
     int64_t t = now_us();
     pthread_mutex_lock(&g.lock);
-    sb_printf(&s, "{\"ok\":true,\"active\":%d,\"output\":", g.selected + 1);
+    sb_printf(&s, "{\"ok\":true,\"inputs\":%d,\"active\":%d,\"output\":", g.cfg.cameras,
+              g.selected + 1);
     sb_json_str(&s, g.no_display ? "none" : g.output_desc);
     sb_printf(&s, ",\"uptime_s\":%lld,\"last_switch_ms\":%.1f,\"cameras\":[",
               (long long)((t - g.start_us) / 1000000), g.last_switch_ms);
-    for (int i = 0; i < NCAM; i++) {
+    for (int i = 0; i < g.cfg.cameras; i++) {
         struct cam *c = &g.cam[i];
         bool sig = c->state == ST_STREAMING &&
                    t - c->last_frame_us < (int64_t)g.cfg.stall_timeout_ms * 1000;
@@ -57,6 +58,14 @@ static char *error_json(const char *msg)
     sb_json_str(&s, msg);
     sb_printf(&s, "}\n");
     return s.b;
+}
+
+/* 400 answer for an input number outside 1..cameras. */
+static char *range_error(void)
+{
+    char msg[64];
+    snprintf(msg, sizeof msg, "caméra 1 à %d", g.cfg.cameras);
+    return error_json(msg);
 }
 
 static enum MHD_Result reply(struct MHD_Connection *conn, unsigned code, char *body)
@@ -143,8 +152,8 @@ static enum MHD_Result http_cb(void *cls, struct MHD_Connection *conn, const cha
         return reply(conn, 200, status_json());
 
     if (sscanf(url, "/select/%d%n", &n, &len) == 1 && !url[len]) {
-        if (n < 1 || n > NCAM)
-            return reply(conn, 400, error_json("caméra 1 à 4"));
+        if (n < 1 || n > g.cfg.cameras)
+            return reply(conn, 400, range_error());
         pthread_mutex_lock(&g.lock);
         if (g.selected != n - 1) {
             g.selected = n - 1;
@@ -157,8 +166,11 @@ static enum MHD_Result http_cb(void *cls, struct MHD_Connection *conn, const cha
 
     if (sscanf(url, "/tally/%d/%15[a-zA-Z]%n", &n, word, &len) == 2 && !url[len]) {
         int t = parse_tally(word);
-        if (n < 1 || n > NCAM || t < 0)
-            return reply(conn, 400, error_json("usage : /tally/<1-4>/<off|pvw|pgm>"));
+        if (n < 1 || n > g.cfg.cameras || t < 0) {
+            char msg[64];
+            snprintf(msg, sizeof msg, "usage : /tally/<1-%d>/<off|pvw|pgm>", g.cfg.cameras);
+            return reply(conn, 400, error_json(msg));
+        }
         pthread_mutex_lock(&g.lock);
         g.cam[n - 1].tally = t;
         pthread_cond_broadcast(&g.cond);
@@ -167,8 +179,8 @@ static enum MHD_Result http_cb(void *cls, struct MHD_Connection *conn, const cha
     }
 
     if (sscanf(url, "/label/%d%n", &n, &len) == 1 && !url[len]) {
-        if (n < 1 || n > NCAM)
-            return reply(conn, 400, error_json("caméra 1 à 4"));
+        if (n < 1 || n > g.cfg.cameras)
+            return reply(conn, 400, range_error());
         char txt[512];
         const char *q = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "text");
         if (q)
@@ -190,8 +202,8 @@ static enum MHD_Result http_cb(void *cls, struct MHD_Connection *conn, const cha
         /* Change one input without disturbing the others: new SRT URL (empty:
            input disabled) and/or SRT latency. Only this input reconnects.
            GET ?url=...&latency_ms=... or form body url=...&latency_ms=... */
-        if (n < 1 || n > NCAM)
-            return reply(conn, 400, error_json("caméra 1 à 4"));
+        if (n < 1 || n > g.cfg.cameras)
+            return reply(conn, 400, range_error());
         char newurl[sizeof g.cam[0].url], lat[16];
         bool has_url = form_value(conn, rq, "url", newurl, sizeof newurl);
         bool has_lat = form_value(conn, rq, "latency_ms", lat, sizeof lat);
