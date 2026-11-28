@@ -106,3 +106,11 @@ void clean_label(char *dst, const char *src)
     while (n > 0 && dst[n - 1] == ' ')
         dst[--n] = 0;
 }
+
+const char *out_tag(int idx)
+{
+    static const char *const tags[] = { "sortie 1 : ", "sortie 2 : ", "sortie 3 : ",
+                                        "sortie 4 : " };
+    _Static_assert(sizeof tags / sizeof *tags == MAX_OUTPUTS, "one tag per output");
+    return g.cfg.outputs > 1 && idx >= 0 && idx < MAX_OUTPUTS ? tags[idx] : "";
+}

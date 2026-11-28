@@ -12,7 +12,8 @@ struct osd_state {
 };
 
 bool osd_differs(const struct osd_state *a, const struct osd_state *b);
-/* draws the overlays into OSD buffer buf (k.ov[buf]) */
-void osd_render(int buf, const struct osd_state *o);
+/* draws the overlays into OSD buffer buf of an output (out->ov[buf]) */
+struct kms_out;
+void osd_render(struct kms_out *out, int buf, const struct osd_state *o);
 
 #endif

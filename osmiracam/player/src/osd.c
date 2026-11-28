@@ -30,10 +30,10 @@ static void text_centered(cairo_t *cr, const char *txt, double size, double maxw
     cairo_show_text(cr, txt);
 }
 
-void osd_render(int buf, const struct osd_state *o)
+void osd_render(struct kms_out *out, int buf, const struct osd_state *o)
 {
-    const double W = k.w, H = k.h, s = H / 1080.0;
-    cairo_t *cr = cairo_create(k.surf);
+    const double W = out->w, H = out->h, s = H / 1080.0;
+    cairo_t *cr = cairo_create(out->surf);
     cairo_set_operator(cr, CAIRO_OPERATOR_CLEAR);
     cairo_paint(cr);
     cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
@@ -75,11 +75,11 @@ void osd_render(int buf, const struct osd_state *o)
         text_centered(cr, "NO SIGNAL", 80 * s, nw - 40 * s, W / 2, H / 2);
     }
     cairo_destroy(cr);
-    cairo_surface_flush(k.surf);
+    cairo_surface_flush(out->surf);
 
-    const uint8_t *src = cairo_image_surface_get_data(k.surf);
-    const int sstride = cairo_image_surface_get_stride(k.surf);
-    struct dumb *d = &k.ov[buf];
-    for (int y = 0; y < k.h; y++)
-        memcpy(d->map + (size_t)y * d->pitch, src + (size_t)y * sstride, (size_t)k.w * 4);
+    const uint8_t *src = cairo_image_surface_get_data(out->surf);
+    const int sstride = cairo_image_surface_get_stride(out->surf);
+    struct dumb *d = &out->ov[buf];
+    for (int y = 0; y < out->h; y++)
+        memcpy(d->map + (size_t)y * d->pitch, src + (size_t)y * sstride, (size_t)out->w * 4);
 }

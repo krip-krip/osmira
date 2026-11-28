@@ -1,4 +1,7 @@
-/* display.c — display thread: shows the selected camera and its overlays. */
+/* display.c — one display thread per output: shows the camera selected for
+ * that output and its overlays, at the pace of its own screen (vblank). */
+#include <errno.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -7,14 +10,30 @@
 #include "kms.h"
 #include "osd.h"
 
+bool input_shown(int idx)
+{
+    for (int i = 0; i < g.cfg.outputs; i++)
+        if (g.out[i].connected && g.out[i].selected == idx)
+            return true;
+    return false;
+}
+
 /* ------------------------------------------------------------------ */
 /* Thread d'affichage                                                  */
 /* ------------------------------------------------------------------ */
 
 void *display_thread(void *arg)
 {
-    (void)arg;
-    pthread_setname_np(pthread_self(), "display");
+    const int oi = (int)(intptr_t)arg;
+    struct kms_out *o = &ko[oi];
+    struct output *out = &g.out[oi];
+    const char *tag = out_tag(oi);
+    char name[24];                 /* thread names: 15 characters at most */
+    if (oi)
+        snprintf(name, sizeof name, "display%d", oi + 1);
+    else
+        snprintf(name, sizeof name, "display");
+    pthread_setname_np(pthread_self(), name);
     set_rt();
 
     AVFrame *cur = NULL;
@@ -28,7 +47,7 @@ void *display_thread(void *arg)
     memset(&drawn, 0, sizeof drawn);
     pthread_mutex_lock(&g.lock);
     while (!g.quit) {
-        const int sel = g.selected;
+        const int sel = out->selected;
         struct cam *c = &g.cam[sel];
         const int64_t t = now_us();
         struct osd_state want;
@@ -39,7 +58,7 @@ void *display_thread(void *arg)
         want.nosig = !(c->state == ST_STREAMING &&
                        t - c->last_frame_us < (int64_t)g.cfg.stall_timeout_ms * 1000);
 
-        bool osd_dirty = !drawn_valid || osd_differs(&want, &drawn) || k.osd_force;
+        bool osd_dirty = !drawn_valid || osd_differs(&want, &drawn) || o->osd_force;
         bool new_frame = c->latest && c->seq && (sel != shown_cam || c->seq != shown_seq);
         bool blank = !c->latest && sel != shown_cam;
 
@@ -61,8 +80,7 @@ void *display_thread(void *arg)
             nf = av_frame_clone(c->latest);
             nseq = c->seq;
         }
-        const int64_t sw_req = sel != shown_cam ? g.switch_req_us : 0;
-        const double age_ms = nf ? (t - c->last_frame_us) / 1000.0 : 0;
+        const int64_t sw_req = sel != shown_cam ? out->switch_req_us : 0;
         pthread_mutex_unlock(&g.lock);
 
         uint32_t nfb = 0;
@@ -71,41 +89,41 @@ void *display_thread(void *arg)
             shown_seq = nseq;          /* on attend l'image suivante */
             usleep(20000);
         }
-        if (nf && !k.video_ok && kms_pick_planes(nfb, nf) < 0) {
-            drmModeRmFB(k.fd, nfb);
+        if (nf && !o->video_ok && kms_pick_planes(o, nfb, nf) < 0) {
+            drmModeRmFB(kd.fd, nfb);
             av_frame_free(&nf);
             shown_seq = nseq;
             sleep_ms(1000);
             pthread_mutex_lock(&g.lock);
             continue;
         }
-        osd_dirty |= k.osd_force;
+        osd_dirty |= o->osd_force;
         int ob = -1;
         if (osd_dirty) {
-            ob = k.ov_cur ^ 1;
-            osd_render(ob, &want);
+            ob = o->ov_cur ^ 1;
+            osd_render(o, ob, &want);
         }
 
         drmModeAtomicReq *req = drmModeAtomicAlloc();
         if (nf)
-            kms_set_video(req, k.vp, nfb, nf);
-        else if (blank && k.vp >= 0)
-            kms_plane_disable(req, &k.pl[k.vp]);
-        if (k.disable_pending >= 0)
-            kms_plane_disable(req, &k.pl[k.disable_pending]);
+            kms_set_video(req, o, o->vp, nfb, nf);
+        else if (blank && o->vp >= 0)
+            kms_plane_disable(req, &kd.pl[o->vp]);
+        if (o->disable_pending >= 0)
+            kms_plane_disable(req, &kd.pl[o->disable_pending]);
         if (ob >= 0)
-            kms_set_osd(req, k.op, k.ov[ob].fb);
-        int ret = drmModeAtomicCommit(k.fd, req, 0, NULL);   /* bloquant : rend la main après le vblank */
+            kms_set_osd(req, o, o->op, o->ov[ob].fb);
+        int ret = drmModeAtomicCommit(kd.fd, req, 0, NULL);   /* bloquant : rend la main après le vblank */
         int err = errno;
         drmModeAtomicFree(req);
 
         if (ret) {
             if (now_us() - last_err_log > 5000000) {
-                logm("DRM : commit refusé : %s", strerror(err));
+                logm("%sDRM : commit refusé : %s", tag, strerror(err));
                 last_err_log = now_us();
             }
             if (nf) {
-                drmModeRmFB(k.fd, nfb);
+                drmModeRmFB(kd.fd, nfb);
                 av_frame_free(&nf);
                 shown_seq = nseq;
             }
@@ -114,29 +132,34 @@ void *display_thread(void *arg)
             continue;
         }
 
-        k.disable_pending = -1;
+        if (o->disable_pending >= 0) {
+            /* plan coupé : il redevient libre pour les autres sorties */
+            pthread_mutex_lock(&kd.lock);
+            kd.pl[o->disable_pending].owner = -1;
+            pthread_mutex_unlock(&kd.lock);
+            o->disable_pending = -1;
+        }
         if (ob >= 0) {
-            k.ov_cur = ob;
+            o->ov_cur = ob;
             drawn = want;
             drawn_valid = true;
-            k.osd_force = false;
+            o->osd_force = false;
         }
         double sw_ms = -1;
         if (nf || blank) {
             if (cur) {
-                drmModeRmFB(k.fd, cur_fb);
+                drmModeRmFB(kd.fd, cur_fb);
                 av_frame_free(&cur);
             }
             cur = nf;
             cur_fb = nfb;
             if (sel != shown_cam) {
                 if (shown_cam < 0)
-                    logm("affichage : première image (cam%d)", sel + 1);
+                    logm("%saffichage : première image (cam%d)", tag, sel + 1);
                 else if (sw_req) {
                     sw_ms = (now_us() - sw_req) / 1000.0;
-                    logm("bascule cam%d -> cam%d : %.1f ms après la requête%s", shown_cam + 1,
-                         sel + 1, sw_ms, blank ? " (pas d'image : écran noir)" : "");
-                    (void)age_ms;
+                    logm("%sbascule cam%d -> cam%d : %.1f ms après la requête%s", tag,
+                         shown_cam + 1, sel + 1, sw_ms, blank ? " (pas d'image : écran noir)" : "");
                 }
             }
             shown_cam = sel;
@@ -144,12 +167,12 @@ void *display_thread(void *arg)
         }
         pthread_mutex_lock(&g.lock);
         if (sw_ms >= 0)
-            g.last_switch_ms = sw_ms;
+            out->last_switch_ms = sw_ms;
     }
     pthread_mutex_unlock(&g.lock);
 
     if (cur) {
-        drmModeRmFB(k.fd, cur_fb);
+        drmModeRmFB(kd.fd, cur_fb);
         av_frame_free(&cur);
     }
     return NULL;

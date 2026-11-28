@@ -16,11 +16,25 @@ static char *status_json(void)
     struct sbuf s = { 0 };
     int64_t t = now_us();
     pthread_mutex_lock(&g.lock);
+    /* active, output, last_switch_ms: output 1 (kept for older clients) */
+    const struct output *o1 = &g.out[0];
     sb_printf(&s, "{\"ok\":true,\"inputs\":%d,\"active\":%d,\"output\":", g.cfg.cameras,
-              g.selected + 1);
-    sb_json_str(&s, g.no_display ? "none" : g.output_desc);
-    sb_printf(&s, ",\"uptime_s\":%lld,\"last_switch_ms\":%.1f,\"cameras\":[",
-              (long long)((t - g.start_us) / 1000000), g.last_switch_ms);
+              o1->selected + 1);
+    sb_json_str(&s, o1->connected ? o1->desc : "none");
+    sb_printf(&s, ",\"uptime_s\":%lld,\"last_switch_ms\":%.1f,\"outputs\":[",
+              (long long)((t - g.start_us) / 1000000), o1->last_switch_ms);
+    for (int i = 0; i < g.cfg.outputs; i++) {
+        const struct output *o = &g.out[i];
+        sb_printf(&s, "%s{\"output\":%d,\"connected\":%s,\"screen\":", i ? "," : "", i + 1,
+                  o->connected ? "true" : "false");
+        if (o->connected)
+            sb_json_str(&s, o->desc);
+        else
+            sb_printf(&s, "null");
+        sb_printf(&s, ",\"active\":%d,\"last_switch_ms\":%.1f}", o->selected + 1,
+                  o->last_switch_ms);
+    }
+    sb_printf(&s, "],\"cameras\":[");
     for (int i = 0; i < g.cfg.cameras; i++) {
         struct cam *c = &g.cam[i];
         bool sig = c->state == ST_STREAMING &&
@@ -151,13 +165,22 @@ static enum MHD_Result http_cb(void *cls, struct MHD_Connection *conn, const cha
     if (!strcmp(url, "/") || !strcmp(url, "/status"))
         return reply(conn, 200, status_json());
 
-    if (sscanf(url, "/select/%d%n", &n, &len) == 1 && !url[len]) {
+    /* /select/N: output 1; /output/M/select/N: output M */
+    int m = 1;
+    if ((sscanf(url, "/select/%d%n", &n, &len) == 1 && !url[len]) ||
+        (sscanf(url, "/output/%d/select/%d%n", &m, &n, &len) == 2 && !url[len])) {
+        if (m < 1 || m > g.cfg.outputs) {
+            char msg[64];
+            snprintf(msg, sizeof msg, "sortie 1 à %d", g.cfg.outputs);
+            return reply(conn, 400, error_json(msg));
+        }
         if (n < 1 || n > g.cfg.cameras)
             return reply(conn, 400, range_error());
+        struct output *o = &g.out[m - 1];
         pthread_mutex_lock(&g.lock);
-        if (g.selected != n - 1) {
-            g.selected = n - 1;
-            g.switch_req_us = now_us();
+        if (o->selected != n - 1) {
+            o->selected = n - 1;
+            o->switch_req_us = now_us();
             pthread_cond_broadcast(&g.cond);
         }
         pthread_mutex_unlock(&g.lock);
@@ -230,7 +253,8 @@ static enum MHD_Result http_cb(void *cls, struct MHD_Connection *conn, const cha
         return reply(conn, 200, status_json());
     }
 
-    return reply(conn, 404, error_json("routes : /status /select/N /tally/N/off|pvw|pgm /label/N /input/N"));
+    return reply(conn, 404, error_json("routes : /status /select/N /output/M/select/N "
+                                       "/tally/N/off|pvw|pgm /label/N /input/N"));
 }
 
 static void http_done(void *cls, struct MHD_Connection *c, void **con_cls,
