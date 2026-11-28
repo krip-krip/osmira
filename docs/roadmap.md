@@ -50,7 +50,7 @@ affichée depuis le Core. Pas de pilotage PTZ à cette étape.
 - [x] `ptzview` : changement d'une entrée à chaud (`/input/N`), entrées
   désactivées ; l'agent ne touche que les entrées modifiées.
 - [x] `ptzview` découpé en modules, indépendant du matériel (ADR 0014).
-- [ ] `ptzview` : nombre de caméras configurable.
+- [x] `ptzview` : nombre de caméras configurable (`cameras`, `slots` de l'agent).
 - [ ] `ptzview` : deuxième sortie HDMI, plus de 4 flux (selon le matériel).
 - [ ] Tally/UMD par SSE.
 
@@ -72,6 +72,8 @@ affichée depuis le Core. Pas de pilotage PTZ à cette étape.
   (via `.252`), rattrapées par les retransmissions (voir `mesures/`).
 - Latence SRT définitive : 20 ou 40 ms ?
 - Débit réel des caméras (~16 Mb/s mesurés vs 12,8 visés).
+- Nombre de flux réels par Pi 4 : 6 mires 1080p ~43 i/s tiennent 25 s (CMA libre
+  85 Mo), à confirmer en endurance à 50 i/s (voir `mesures/2026-11-28-nombre-de-cameras.md`).
 - Latence de bout en bout à mesurer sur place.
 - Stabilité de la CMA sur une endurance de 30 min et plus. Essai du 27/11 :
   CMA libre 21–28 Mo (basse), coupure simultanée des 4 flux quand un seul cale

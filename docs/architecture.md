@@ -22,7 +22,7 @@
    │   ├─ mappage : événements → actions (profil venant du Core)        │
    │   ├─ pilotes caméras : Panasonic, Sony, Canon…  ──────────────► caméras PTZ
    │   └─ pilote ptzview en HTTP local                                  │
-   │  ptzview (C) : 4 décodages HEVC permanents → HDMI + calques        │
+   │  ptzview (C) : N décodages HEVC permanents → HDMI + calques        │
    └────────────────────▲───────────────────────────────────────────────┘
                         │ SRT/H.265
                    MediaMTX ◄──── caméras (SRT listener)
@@ -42,7 +42,8 @@
   image figée + « NO SIGNAL » en cas de perte.
 - API HTTP locale : `/status`, `/select/N`, `/tally/N/off|pvw|pgm`, `/label/N`,
   `/input/N` (nouvelle URL d'une entrée à chaud ; vide = désactivée).
-- Évolution prévue : nombre de caméras configurable.
+- Nombre d'entrées réglable (`cameras`, 1 à 16, 4 par défaut ; `slots` de l'agent).
+- Évolution prévue : plusieurs sorties HDMI.
 
 ### agent OsmiraCam (Python)
 - **Connecteur Core** : récupère la configuration complète (versionnée), l'enregistre
