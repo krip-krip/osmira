@@ -76,26 +76,40 @@ class ConfigStore:
 
 
 class SelectionStore:
-    """Keeps the camera last chosen by the Core, to show it again after a
-    restart even if the Core is unreachable."""
+    """Keeps the camera last chosen by the Core for each output, to show it
+    again after a restart even if the Core is unreachable."""
 
     def __init__(self, state_dir: Path) -> None:
         self.path = state_dir / "selection.json"
 
-    def load(self) -> str | None:
+    def load(self) -> dict[int, str | None]:
+        """{output: camera id}; reads the older format (one camera = output 1)."""
         try:
-            camera_id = json.loads(self.path.read_text()).get("camera_id")
+            data = json.loads(self.path.read_text())
         except FileNotFoundError:
-            return None
-        except (ValueError, AttributeError) as exc:
+            return {}
+        except ValueError as exc:
             log.warning("ignoring unreadable stored selection %s: %s", self.path, exc)
-            return None
-        return camera_id if isinstance(camera_id, str) else None
+            return {}
+        if not isinstance(data, dict):
+            return {}
+        if "outputs" not in data:  # {"camera_id": ...}, before several outputs
+            camera_id = data.get("camera_id")
+            return {1: camera_id} if isinstance(camera_id, str) else {}
+        outputs = data["outputs"]
+        if not isinstance(outputs, dict):
+            return {}
+        return {
+            int(output): camera_id
+            for output, camera_id in outputs.items()
+            if output.isdigit() and (camera_id is None or isinstance(camera_id, str))
+        }
 
-    def save(self, camera_id: str | None) -> None:
+    def save(self, selections: dict[int, str | None]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"camera_id": camera_id}))
+        outputs = {str(output): camera_id for output, camera_id in sorted(selections.items())}
+        tmp.write_text(json.dumps({"outputs": outputs}))
         os.replace(tmp, self.path)
 
 

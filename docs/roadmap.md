@@ -53,7 +53,7 @@ affichée depuis le Core. Pas de pilotage PTZ à cette étape.
 - [x] `ptzview` : nombre de caméras configurable (`cameras`, `slots` de l'agent).
 - [x] `ptzview` : plusieurs sorties vidéo (`outputs`, `/output/M/select/N`),
   essayé avec un seul écran.
-- [ ] Agent : une caméra par sortie (sélections du Core pour chaque sortie).
+- [x] Agent : une caméra par sortie (sélections du Core pour chaque sortie).
 - [ ] Essai à deux écrans (deux sorties HDMI du Pi 4).
 - [ ] Tally/UMD par SSE.
 

@@ -125,7 +125,7 @@ def test_display_slot(settings):
 def test_start_on_the_selected_camera(settings):
     config = StationConfig.from_json(core_config([("cam1", 1, True), ("cam2", 2, True)]))
 
-    general = parse(render(config, settings.ptzview, selected="cam2"))["general"]
+    general = parse(render(config, settings.ptzview, {1: "cam2"}))["general"]
 
     assert general["start_camera"] == "2"
 
@@ -163,3 +163,27 @@ def test_tagging_can_be_disabled(settings):
     conf = parse(render(config, settings.ptzview, tag_station=False))
 
     assert conf["cam1"]["url"].endswith("streamid=read:cam1")
+
+
+def test_outputs_from_the_core(settings):
+    data = core_config([("cam1", 1, True), ("cam2", 2, True)])
+    data["station"]["outputs"] = 2
+    config = StationConfig.from_json(data)
+    ptz = dataclasses.replace(settings.ptzview, outputs={2: {"connector": "HDMI-A-2"}})
+
+    conf = parse(render(config, ptz, {1: "cam2", 2: "cam1"}))
+
+    assert conf["general"]["outputs"] == "2"
+    assert conf["general"]["start_camera"] == "2"
+    assert conf["output2"] == {"connector": "HDMI-A-2", "start_camera": "1"}
+
+
+def test_outputs_are_capped_to_what_ptzview_has(settings):
+    data = core_config([("cam1", 1, True)])
+    data["station"]["outputs"] = 9
+    config = StationConfig.from_json(data)
+
+    conf = parse(render(config, settings.ptzview))
+
+    assert conf["general"]["outputs"] == "4"
+    assert [s for s in conf if s.startswith("output")] == ["output2", "output3", "output4"]

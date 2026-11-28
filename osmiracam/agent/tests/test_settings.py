@@ -42,3 +42,11 @@ def test_slots_out_of_range_is_refused(tmp_path, slots):
 
     with pytest.raises(ValueError, match="slots"):
         load_settings(tmp_path / "agent.toml")
+
+
+def test_settings_of_other_outputs(tmp_path):
+    (tmp_path / "agent.toml").write_text(
+        'core_url = "http://core"\n[ptzview.output2]\nconnector = "HDMI-A-2"\n'
+    )
+
+    assert load_settings(tmp_path / "agent.toml").ptzview.outputs == {2: {"connector": "HDMI-A-2"}}

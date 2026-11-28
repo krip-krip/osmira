@@ -1,5 +1,5 @@
 """Main loop: keep ptzview running with the latest station configuration and
-show the camera chosen in the Core's matrix (ADR 0009).
+show on each output the camera chosen in the Core's matrix (ADR 0009).
 
 - At start, use the local copies of the last configuration and selection, so
   the station shows pictures even when the Core is unreachable.
@@ -9,7 +9,7 @@ show the camera chosen in the Core's matrix (ADR 0009).
 - Also ask the Core for a newer configuration every poll_interval_s, as a
   fallback (If-None-Match: a 304 costs almost nothing).
 - A new configuration rewrites ptzview.conf and restarts ptzview, which then
-  starts on the selected camera.
+  starts each output on its selected camera.
 """
 
 import asyncio
@@ -23,14 +23,18 @@ from osmiracam_agent import __version__, ptzview_conf, station_info
 from osmiracam_agent.core_client import CoreClient, CoreEvent, CoreUnavailable
 from osmiracam_agent.metrics import SystemMetrics, throttled_flags
 from osmiracam_agent.ptzview_client import PtzviewClient, PtzviewUnavailable
-from osmiracam_agent.settings import Settings
-from osmiracam_agent.station_config import ConfigStore, SelectionStore, SlotsStore, StationConfig
+from osmiracam_agent.settings import MAX_OUTPUTS, Settings
+from osmiracam_agent.station_config import (
+    Camera,
+    ConfigStore,
+    SelectionStore,
+    SlotsStore,
+    StationConfig,
+)
 from osmiracam_agent.supervisor import Supervisor
 
 log = logging.getLogger(__name__)
 
-# ptzview has a single video output for now.
-OUTPUT = 1
 SELECT_RETRY_INTERVAL_S = 0.5
 
 
@@ -55,14 +59,15 @@ class Agent:
         self._status_error: str | None = None
         self._metrics = SystemMetrics()
         self._refresh_lock = asyncio.Lock()
-        self._select_task: asyncio.Task[None] | None = None
+        # Switch still waiting for ptzview, per output (the latest choice wins).
+        self._select_tasks: dict[int, asyncio.Task[None]] = {}
         self._core_reachable: bool | None = None
         self._events_connected: bool | None = None
         self.config: StationConfig | None = None
-        # Camera chosen by the Core for our output (None: no choice).
-        self.selected: str | None = None
-        # Last ptzview input successfully switched to (for logs and tests).
-        self.shown_slot: int | None = None
+        # Camera chosen by the Core for each output (missing or None: no choice).
+        self.selected: dict[int, str | None] = {}
+        # Last ptzview input successfully switched to, per output (logs, tests).
+        self.shown_slots: dict[int, int] = {}
         # Camera id in each ptzview input (stable across configuration changes).
         self.assignment: list[str | None] | None = None
         self._slots_store = SlotsStore(settings.state_dir)
@@ -123,9 +128,9 @@ class Agent:
         if not self._supervisor.running:
             self._supervisor.start()
             return
-        if old_config is None or ptzview_conf.general(
+        if old_config is None or ptzview_conf.restart_settings(
             old_config, ptz, old_assignment
-        ) != ptzview_conf.general(config, ptz, assignment):
+        ) != ptzview_conf.restart_settings(config, ptz, assignment):
             log.info("ptzview settings changed: restarting it")
             await self._supervisor.restart()
             return
@@ -143,16 +148,17 @@ class Agent:
             log.warning("cannot update ptzview inputs live (%s): restarting it", exc)
             await self._supervisor.restart()
             return
-        # The shown camera may have left: show the camera chosen by the Core again.
-        await self.select(self.selected)
+        # A shown camera may have left: show the cameras chosen by the Core again.
+        for output in range(1, ptzview_conf.output_count(config) + 1):
+            await self.select(self.selected.get(output), output)
 
     # --- selection --------------------------------------------------------------
 
-    async def select(self, camera_id: str | None) -> None:
-        """Show the camera chosen by the Core (None: first viewable camera)."""
-        if camera_id != self.selected:
-            self.selected = camera_id
-            self._selection_store.save(camera_id)
+    async def select(self, camera_id: str | None, output: int = 1) -> None:
+        """Show on `output` the camera chosen by the Core (None: first viewable camera)."""
+        if camera_id != self.selected.get(output):
+            self.selected[output] = camera_id
+            self._selection_store.save(self.selected)
         if self.config is None:
             return  # applied as start_camera once a configuration arrives
         slots = self._settings.ptzview.slots
@@ -161,27 +167,44 @@ class Agent:
             log.warning(
                 "camera '%s' is not among the ptzview inputs: showing input %d", camera_id, slot
             )
-        # Latest choice wins: drop a switch still waiting for ptzview.
-        if self._select_task is not None:
-            self._select_task.cancel()
-        self._select_task = asyncio.create_task(self._push_select(slot), name="ptzview-select")
+        # Latest choice wins: drop a switch of this output still waiting for ptzview.
+        previous = self._select_tasks.get(output)
+        if previous is not None:
+            previous.cancel()
+        self._select_tasks[output] = asyncio.create_task(
+            self._push_select(slot, output), name=f"ptzview-select-{output}"
+        )
 
-    async def _push_select(self, slot: int) -> None:
+    async def _push_select(self, slot: int, output: int) -> None:
         """Switch ptzview, retrying while it is (re)starting."""
         loop = asyncio.get_running_loop()
         deadline = loop.time() + self._settings.ptzview.select_retry_s
         while True:
             try:
-                await self._ptzview.select(slot)
+                await self._ptzview.select(slot, output)
             except PtzviewUnavailable as exc:
                 if loop.time() >= deadline:
-                    log.warning("could not switch ptzview to input %d: %s", slot, exc)
+                    log.warning(
+                        "could not switch ptzview output %d to input %d: %s", output, slot, exc
+                    )
                     return
                 await asyncio.sleep(SELECT_RETRY_INTERVAL_S)
             else:
-                self.shown_slot = slot
-                log.info("showing input %d (%s)", slot, self.selected or "first viewable camera")
+                self.shown_slots[output] = slot
+                log.info(
+                    "output %d: showing input %d (%s)",
+                    output,
+                    slot,
+                    self.selected.get(output) or "first viewable camera",
+                )
                 return
+
+    def _known_output(self, output: object) -> bool:
+        """An output of this station that ptzview has (others are ignored)."""
+        if not isinstance(output, int):
+            return False
+        count = ptzview_conf.output_count(self.config) if self.config else MAX_OUTPUTS
+        return 1 <= output <= count
 
     # --- events from the Core ---------------------------------------------------
 
@@ -191,11 +214,11 @@ class Agent:
             if event.data.get("config_version") != current:
                 await self.refresh()
             for item in event.data.get("selections", []):
-                if item.get("output") == OUTPUT:
-                    await self.select(item.get("camera_id"))
+                if self._known_output(item.get("output")):
+                    await self.select(item.get("camera_id"), item["output"])
         elif event.name == "select":
-            if event.data.get("output") == OUTPUT:
-                await self.select(event.data.get("camera_id"))
+            if self._known_output(event.data.get("output")):
+                await self.select(event.data.get("camera_id"), event.data["output"])
         elif event.name == "config_changed":
             if event.data.get("version") != current:
                 await self.refresh()
@@ -242,7 +265,7 @@ class Agent:
                 if camera is None:
                     continue  # free input
                 if entry.get("cam") == ptz_status.get("active"):
-                    player["shown_camera"] = camera.id
+                    player["shown_camera"] = camera.id  # output 1
                 cameras.append(
                     {
                         "camera_id": camera.id,
@@ -271,6 +294,17 @@ class Agent:
                     "cma_total_mb": ptz_system.get("cma_total_kb", 0) // 1024,
                 }
             )
+            # Each output: screen found or not, camera shown (older ptzview: no list).
+            player["outputs"] = [
+                {
+                    "output": item.get("output"),
+                    "connected": item.get("connected"),
+                    "screen": item.get("screen"),
+                    "selected_camera": self.selected.get(item.get("output")),
+                    "shown_camera": _slot_camera(slots, item.get("active")),
+                }
+                for item in ptz_status.get("outputs", [])
+            ]
         player["cameras"] = cameras
         metrics = await asyncio.to_thread(lambda: self._metrics.sample(throttled_flags()))
         return {
@@ -279,7 +313,7 @@ class Agent:
             "hostname": station_info.hostname(),
             "addresses": station_info.addresses(),
             "config_version": self.config.version if self.config else None,
-            "selected_camera": self.selected,
+            "selected_camera": self.selected.get(1),
             "player": player,
             "hardware": self._hardware,
             "system": system,
@@ -314,11 +348,10 @@ class Agent:
         ]
         await stop.wait()
         log.info("stopping")
-        for task in [*tasks, self._select_task]:
-            if task is not None:
-                task.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await task
+        for task in [*tasks, *self._select_tasks.values()]:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
         await self._supervisor.stop()
 
 
@@ -334,3 +367,11 @@ def _write_atomic(path: Path, text: str) -> None:
     tmp = path.with_suffix(".tmp")
     tmp.write_text(text)
     os.replace(tmp, path)
+
+
+def _slot_camera(slots: list[Camera | None], cam: object) -> str | None:
+    """Camera id in ptzview input `cam` (1 = cam1), None for a free input."""
+    if not isinstance(cam, int) or not 1 <= cam <= len(slots):
+        return None
+    camera = slots[cam - 1]
+    return camera.id if camera else None

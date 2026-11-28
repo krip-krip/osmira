@@ -7,13 +7,14 @@ changing a camera only touches its own input. A free input has no URL, so
 ptzview does not try to connect it (disabled, NO SIGNAL if shown).
 """
 
-from osmiracam_agent.settings import PtzviewSettings
+from osmiracam_agent.settings import MAX_OUTPUTS, PtzviewSettings
 from osmiracam_agent.station_config import Camera, StationConfig
 
 UNUSED_SLOT_URL = ""  # no URL: ptzview disables the input
 DEFAULT_LATENCY_MS = 20
 
 Assignment = list[str | None]  # camera id per input (index 0 = cam1), None = free
+Selections = dict[int, str | None]  # camera chosen by the Core per output (1 = first)
 
 
 def assign_slots(
@@ -78,6 +79,11 @@ def slot_inputs(
     return inputs
 
 
+def output_count(config: StationConfig) -> int:
+    """Video outputs of the station (from the Core), within what ptzview supports."""
+    return max(1, min(config.outputs, MAX_OUTPUTS))
+
+
 def general(
     config: StationConfig, settings: PtzviewSettings, assignment: Assignment | None = None
 ) -> list[str]:
@@ -86,10 +92,27 @@ def general(
     input ([camN] latency_ms): the general value is only a fixed default."""
     lines = [
         f"cameras = {settings.slots}",
+        f"outputs = {output_count(config)}",
         f"srt_latency_ms = {DEFAULT_LATENCY_MS}",
         f"http_port = {settings.http_port}",
     ]
     lines += [f"{key} = {_one_line(value)}" for key, value in sorted(settings.general.items())]
+    return lines
+
+
+def output_settings(settings: PtzviewSettings, output: int) -> list[str]:
+    """[outputN] keys from agent.toml (connector...), start_camera excepted."""
+    keys = settings.outputs.get(output, {})
+    return [f"{key} = {_one_line(value)}" for key, value in sorted(keys.items())]
+
+
+def restart_settings(
+    config: StationConfig, settings: PtzviewSettings, assignment: Assignment | None = None
+) -> list[str]:
+    """Everything in ptzview.conf that only applies when ptzview starts again."""
+    lines = general(config, settings, assignment)
+    for output in range(2, output_count(config) + 1):
+        lines += [f"[output{output}]", *output_settings(settings, output)]
     return lines
 
 
@@ -123,11 +146,11 @@ def tag_streamid(url: str, station_id: str) -> str:
 def render(
     config: StationConfig,
     settings: PtzviewSettings,
-    selected: str | None = None,
+    selections: Selections | None = None,
     tag_station: bool = True,
     assignment: Assignment | None = None,
 ) -> str:
-    """ptzview.conf text; ptzview starts on the `selected` camera if possible.
+    """ptzview.conf text; each output starts on its selected camera if possible.
 
     tag_station: sign the SRT connections with the station id (tag_streamid).
     """
@@ -138,8 +161,16 @@ def render(
         "",
         "[general]",
         *general(config, settings, assignment),
-        f"start_camera = {display_slot(config, settings.slots, selected, assignment)}",
     ]
+    selections = selections or {}
+
+    def start(output: int) -> str:
+        slot = display_slot(config, settings.slots, selections.get(output), assignment)
+        return f"start_camera = {slot}"
+
+    lines.append(start(1))
+    for output in range(2, output_count(config) + 1):
+        lines += ["", f"[output{output}]", *output_settings(settings, output), start(output)]
     inputs = slot_inputs(config, settings.slots, assignment, tag_station)
     for index, (url, label, latency) in enumerate(inputs, start=1):
         lines += ["", f"[cam{index}]", f"url = {url}", f"latency_ms = {latency}"]
