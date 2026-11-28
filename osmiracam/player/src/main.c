@@ -12,6 +12,7 @@
  * Usage : ptzview [-n] [fichier.conf]
  *   -n : pas d'affichage (décodage + API seulement, pour diagnostic)
  */
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -62,7 +63,8 @@ int main(int argc, char **argv)
     config_defaults();
     if (load_config(cfgpath) < 0)
         return 1;
-    g.selected = g.cfg.start_camera - 1;
+    for (int i = 0; i < MAX_OUTPUTS; i++)
+        g.out[i].selected = g.cfg.out[i].start_camera - 1;
     g.start_us = now_us();
 
     pthread_condattr_t ca;
@@ -101,14 +103,17 @@ int main(int argc, char **argv)
 
     http_start(g.cfg.http_port);
 
-    pthread_t disp;
-    if (!g.no_display)
-        pthread_create(&disp, NULL, display_thread, NULL);
+    for (int i = 0; i < g.cfg.outputs; i++)
+        if (g.out[i].connected)
+            pthread_create(&g.out[i].th, NULL, display_thread, (void *)(intptr_t)i);
     for (int i = 0; i < g.cfg.cameras; i++)
         pthread_create(&g.cam[i].th, NULL, cam_thread, &g.cam[i]);
 
-    logm("prêt : %d entrées, cam%d à l'écran, latence SRT %d ms. Ctrl+C pour quitter.",
-         g.cfg.cameras, g.selected + 1, g.cfg.srt_latency_ms);
+    for (int i = 0; i < g.cfg.outputs; i++)
+        logm("%s%s, cam%d", out_tag(i), g.out[i].connected ? g.out[i].desc : "pas d'écran",
+             g.out[i].selected + 1);
+    logm("prêt : %d entrées, %d sortie(s), latence SRT %d ms. Ctrl+C pour quitter.",
+         g.cfg.cameras, g.cfg.outputs, g.cfg.srt_latency_ms);
 
     int64_t next_stats = now_us() + (int64_t)g.cfg.stats_interval_s * 1000000;
     while (!g.quit) {
@@ -122,8 +127,16 @@ int main(int argc, char **argv)
                 struct cam *c = &g.cam[i];
                 bool sig = c->state == ST_STREAMING &&
                            t - c->last_frame_us < (int64_t)g.cfg.stall_timeout_ms * 1000;
-                sb_printf(&line, "%scam%d%s %s ", i ? "| " : "", i + 1,
-                          i == g.selected ? "*" : "", tally_name[c->tally]);
+                /* "*": shown (single output), "*2": shown on output 2 */
+                sb_printf(&line, "%scam%d", i ? "| " : "", i + 1);
+                for (int o = 0; o < g.cfg.outputs; o++)
+                    if (g.out[o].selected == i) {
+                        if (g.cfg.outputs > 1)
+                            sb_printf(&line, "*%d", o + 1);
+                        else
+                            sb_printf(&line, "*");
+                    }
+                sb_printf(&line, " %s ", tally_name[c->tally]);
                 if (sig)
                     sb_printf(&line, "%.1f i/s %.1f Mb/s ", c->fps, c->mbps);
                 else
@@ -140,8 +153,9 @@ int main(int argc, char **argv)
     pthread_mutex_lock(&g.lock);
     pthread_cond_broadcast(&g.cond);
     pthread_mutex_unlock(&g.lock);
-    if (!g.no_display)
-        pthread_join(disp, NULL);
+    for (int i = 0; i < g.cfg.outputs; i++)
+        if (g.out[i].connected)
+            pthread_join(g.out[i].th, NULL);
     for (int i = 0; i < g.cfg.cameras; i++)
         pthread_join(g.cam[i].th, NULL);
     http_stop();

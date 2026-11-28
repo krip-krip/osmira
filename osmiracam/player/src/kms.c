@@ -1,4 +1,4 @@
-/* kms.c — DRM/KMS output: connector, mode, planes, framebuffers, atomic requests. */
+/* kms.c — DRM/KMS outputs: connectors, modes, planes, framebuffers, atomic requests. */
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -17,15 +17,16 @@
 /* Affichage DRM/KMS                                                   */
 /* ------------------------------------------------------------------ */
 
-struct kms k = { .fd = -1, .vp = -1, .op = -1, .disable_pending = -1 };
+struct kms_dev kd = { .fd = -1, .lock = PTHREAD_MUTEX_INITIALIZER };
+struct kms_out ko[MAX_OUTPUTS];
 
 static void load_plane(struct plane_info *p)
 {
-    drmModeObjectProperties *pr = drmModeObjectGetProperties(k.fd, p->id, DRM_MODE_OBJECT_PLANE);
+    drmModeObjectProperties *pr = drmModeObjectGetProperties(kd.fd, p->id, DRM_MODE_OBJECT_PLANE);
     if (!pr)
         return;
     for (uint32_t i = 0; i < pr->count_props; i++) {
-        drmModePropertyRes *q = drmModeGetProperty(k.fd, pr->props[i]);
+        drmModePropertyRes *q = drmModeGetProperty(kd.fd, pr->props[i]);
         if (!q)
             continue;
         const char *n = q->name;
@@ -68,12 +69,12 @@ static void load_plane(struct plane_info *p)
 
 static uint32_t obj_prop(uint32_t obj, uint32_t type, const char *name)
 {
-    drmModeObjectProperties *pr = drmModeObjectGetProperties(k.fd, obj, type);
+    drmModeObjectProperties *pr = drmModeObjectGetProperties(kd.fd, obj, type);
     uint32_t id = 0;
     if (!pr)
         return 0;
     for (uint32_t i = 0; i < pr->count_props && !id; i++) {
-        drmModePropertyRes *q = drmModeGetProperty(k.fd, pr->props[i]);
+        drmModePropertyRes *q = drmModeGetProperty(kd.fd, pr->props[i]);
         if (q && !strcmp(q->name, name))
             id = q->prop_id;
         drmModeFreeProperty(q);
@@ -94,11 +95,11 @@ void kms_plane_disable(drmModeAtomicReq *r, const struct plane_info *p)
     add(r, p->id, p->crtc_id, 0);
 }
 
-static void plane_full(drmModeAtomicReq *r, const struct plane_info *p, uint32_t fb,
-                       int sw, int sh, int dx, int dy, int dw, int dh)
+static void plane_full(drmModeAtomicReq *r, const struct kms_out *o, const struct plane_info *p,
+                       uint32_t fb, int sw, int sh, int dx, int dy, int dw, int dh)
 {
     add(r, p->id, p->fb_id, fb);
-    add(r, p->id, p->crtc_id, k.crtc);
+    add(r, p->id, p->crtc_id, o->crtc);
     add(r, p->id, p->src_x, 0);
     add(r, p->id, p->src_y, 0);
     add(r, p->id, p->src_w, (uint64_t)sw << 16);
@@ -109,27 +110,28 @@ static void plane_full(drmModeAtomicReq *r, const struct plane_info *p, uint32_t
     add(r, p->id, p->crtc_h, dh);
 }
 
-void kms_set_osd(drmModeAtomicReq *r, int op, uint32_t fb)
+void kms_set_osd(drmModeAtomicReq *r, const struct kms_out *o, int op, uint32_t fb)
 {
-    const struct plane_info *p = &k.pl[op];
-    plane_full(r, p, fb, k.w, k.h, 0, 0, k.w, k.h);
+    const struct plane_info *p = &kd.pl[op];
+    plane_full(r, o, p, fb, o->w, o->h, 0, 0, o->w, o->h);
     if (p->zpos)
         add(r, p->id, p->zpos, p->zmax);
 }
 
-void kms_set_video(drmModeAtomicReq *r, int vp, uint32_t fb, const AVFrame *f)
+void kms_set_video(drmModeAtomicReq *r, const struct kms_out *o, int vp, uint32_t fb,
+                   const AVFrame *f)
 {
-    const struct plane_info *p = &k.pl[vp];
+    const struct plane_info *p = &kd.pl[vp];
     int sw = f->width, sh = f->height, dw, dh;
     /* conserve le rapport d'image */
-    if ((int64_t)sw * k.h > (int64_t)sh * k.w) {
-        dw = k.w;
-        dh = (int)((int64_t)k.w * sh / sw);
+    if ((int64_t)sw * o->h > (int64_t)sh * o->w) {
+        dw = o->w;
+        dh = (int)((int64_t)o->w * sh / sw);
     } else {
-        dh = k.h;
-        dw = (int)((int64_t)k.h * sw / sh);
+        dh = o->h;
+        dw = (int)((int64_t)o->h * sw / sh);
     }
-    plane_full(r, p, fb, sw, sh, (k.w - dw) / 2, (k.h - dh) / 2, dw, dh);
+    plane_full(r, o, p, fb, sw, sh, (o->w - dw) / 2, (o->h - dh) / 2, dw, dh);
     if (p->zpos)
         add(r, p->id, p->zpos, p->zmin);
     if (p->color_enc) {
@@ -149,21 +151,21 @@ void kms_set_video(drmModeAtomicReq *r, int vp, uint32_t fb, const AVFrame *f)
     }
 }
 
-static int dumb_create(struct dumb *d)
+static int dumb_create(struct dumb *d, int w, int h)
 {
-    struct drm_mode_create_dumb c = { .width = k.w, .height = k.h, .bpp = 32 };
-    if (drmIoctl(k.fd, DRM_IOCTL_MODE_CREATE_DUMB, &c))
+    struct drm_mode_create_dumb c = { .width = w, .height = h, .bpp = 32 };
+    if (drmIoctl(kd.fd, DRM_IOCTL_MODE_CREATE_DUMB, &c))
         return -1;
     d->handle = c.handle;
     d->pitch = c.pitch;
     d->size = c.size;
-    uint32_t h[4] = { c.handle }, p[4] = { c.pitch }, o[4] = { 0 };
-    if (drmModeAddFB2(k.fd, k.w, k.h, DRM_FORMAT_ARGB8888, h, p, o, &d->fb, 0))
+    uint32_t hd[4] = { c.handle }, p[4] = { c.pitch }, o[4] = { 0 };
+    if (drmModeAddFB2(kd.fd, w, h, DRM_FORMAT_ARGB8888, hd, p, o, &d->fb, 0))
         return -1;
     struct drm_mode_map_dumb m = { .handle = c.handle };
-    if (drmIoctl(k.fd, DRM_IOCTL_MODE_MAP_DUMB, &m))
+    if (drmIoctl(kd.fd, DRM_IOCTL_MODE_MAP_DUMB, &m))
         return -1;
-    d->map = mmap(NULL, c.size, PROT_READ | PROT_WRITE, MAP_SHARED, k.fd, m.offset);
+    d->map = mmap(NULL, c.size, PROT_READ | PROT_WRITE, MAP_SHARED, kd.fd, m.offset);
     if (d->map == MAP_FAILED) {
         d->map = NULL;
         return -1;
@@ -177,10 +179,10 @@ static void dumb_destroy(struct dumb *d)
     if (d->map)
         munmap(d->map, d->size);
     if (d->fb)
-        drmModeRmFB(k.fd, d->fb);
+        drmModeRmFB(kd.fd, d->fb);
     if (d->handle) {
         struct drm_mode_destroy_dumb x = { .handle = d->handle };
-        drmIoctl(k.fd, DRM_IOCTL_MODE_DESTROY_DUMB, &x);
+        drmIoctl(kd.fd, DRM_IOCTL_MODE_DESTROY_DUMB, &x);
     }
     memset(d, 0, sizeof *d);
 }
@@ -192,9 +194,8 @@ static const char *conn_name(drmModeConnector *c, char *buf, size_t n)
     return buf;
 }
 
-static bool pick_mode(drmModeConnector *c, drmModeModeInfo *out)
+static bool pick_mode(drmModeConnector *c, const char *m, drmModeModeInfo *out)
 {
-    const char *m = g.cfg.hdmi_mode;
     int w = 0, h = 0, hz = 0;
     if (!strcasecmp(m, "auto")) {
         for (int i = 0; i < c->count_modes; i++)
@@ -229,11 +230,16 @@ static bool pick_mode(drmModeConnector *c, drmModeModeInfo *out)
     return false;
 }
 
-int kms_init(void)
+/* Can output o use plane i (right CRTC, not taken by another output)? (kd.lock) */
+static bool plane_usable(const struct kms_out *o, int i)
 {
-    char path[64], name[32];
-    drmModeRes *res = NULL;
+    const struct plane_info *p = &kd.pl[i];
+    return (p->possible_crtcs & (1u << o->crtc_idx)) && (p->owner < 0 || p->owner == o->idx);
+}
 
+static int open_device(drmModeRes **res)
+{
+    char path[64];
     for (int i = 0; i < 8; i++) {
         if (strcmp(g.cfg.drm_device, "auto"))
             snprintf(path, sizeof path, "%s", g.cfg.drm_device);
@@ -241,179 +247,258 @@ int kms_init(void)
             snprintf(path, sizeof path, "/dev/dri/card%d", i);
         int fd = open(path, O_RDWR | O_CLOEXEC);
         if (fd >= 0) {
-            res = drmModeGetResources(fd);
-            if (res && res->count_connectors && res->count_crtcs) {
-                k.fd = fd;
+            *res = drmModeGetResources(fd);
+            if (*res && (*res)->count_connectors && (*res)->count_crtcs) {
+                kd.fd = fd;
                 break;
             }
-            if (res)
-                drmModeFreeResources(res);
-            res = NULL;
+            if (*res)
+                drmModeFreeResources(*res);
+            *res = NULL;
             close(fd);
         }
         if (strcmp(g.cfg.drm_device, "auto"))
             break;
     }
-    if (k.fd < 0) {
+    if (kd.fd < 0) {
         logm("DRM : aucune carte d'affichage trouvée (drm_device=%s)", g.cfg.drm_device);
         return -1;
     }
-    if (drmSetClientCap(k.fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1) ||
-        drmSetClientCap(k.fd, DRM_CLIENT_CAP_ATOMIC, 1)) {
+    if (drmSetClientCap(kd.fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1) ||
+        drmSetClientCap(kd.fd, DRM_CLIENT_CAP_ATOMIC, 1)) {
         logm("DRM : mode atomique non disponible");
         return -1;
     }
+    return 0;
+}
 
-    /* connecteur */
-    drmModeConnector *conn = NULL;
-    for (int i = 0; i < res->count_connectors && !conn; i++) {
-        drmModeConnector *c = drmModeGetConnector(k.fd, res->connectors[i]);
+static void load_planes(void)
+{
+    drmModePlaneRes *pr = drmModeGetPlaneResources(kd.fd);
+    if (!pr)
+        return;
+    for (uint32_t i = 0; i < pr->count_planes && kd.npl < MAX_PLANES; i++) {
+        drmModePlane *p = drmModeGetPlane(kd.fd, pr->planes[i]);
+        if (!p)
+            continue;
+        struct plane_info *pi = &kd.pl[kd.npl++];
+        memset(pi, 0, sizeof *pi);
+        pi->id = p->plane_id;
+        pi->possible_crtcs = p->possible_crtcs;
+        pi->owner = -1;
+        for (uint32_t f = 0; f < p->count_formats; f++) {
+            if (p->formats[f] == DRM_FORMAT_NV12) pi->nv12 = true;
+            if (p->formats[f] == DRM_FORMAT_ARGB8888) pi->argb = true;
+        }
+        load_plane(pi);
+        drmModeFreePlane(p);
+    }
+    drmModeFreePlaneResources(pr);
+}
+
+static void list_connectors(drmModeRes *res)
+{
+    char name[32];
+    logm("DRM : connecteurs :");
+    for (int i = 0; i < res->count_connectors; i++) {
+        drmModeConnector *c = drmModeGetConnector(kd.fd, res->connectors[i]);
         if (!c)
             continue;
-        conn_name(c, name, sizeof name);
-        bool want = g.cfg.connector[0] && strcasecmp(g.cfg.connector, "auto")
-                        ? !strcmp(name, g.cfg.connector)
-                        : c->connection == DRM_MODE_CONNECTED;
-        if (want && c->count_modes)
-            conn = c;
-        else
-            drmModeFreeConnector(c);
+        logm("   %s (%s)", conn_name(c, name, sizeof name),
+             c->connection == DRM_MODE_CONNECTED ? "connecté" : "déconnecté");
+        drmModeFreeConnector(c);
     }
-    if (!conn) {
-        logm("DRM : connecteur « %s » introuvable ou sans mode. Connecteurs :", g.cfg.connector);
-        for (int i = 0; i < res->count_connectors; i++) {
-            drmModeConnector *c = drmModeGetConnector(k.fd, res->connectors[i]);
-            if (!c)
-                continue;
-            logm("   %s (%s)", conn_name(c, name, sizeof name),
-                 c->connection == DRM_MODE_CONNECTED ? "connecté" : "déconnecté");
-            drmModeFreeConnector(c);
-        }
-        return -1;
-    }
-    k.conn = conn->connector_id;
-    conn_name(conn, name, sizeof name);
+}
 
-    if (!pick_mode(conn, &k.mode)) {
-        logm("DRM : mode « %s » introuvable sur %s. Modes disponibles :", g.cfg.hdmi_mode, name);
+/* Mode, CRTC, OSD plane and buffers of output o on connector conn, then modeset. */
+static int output_setup(struct kms_out *o, drmModeRes *res, drmModeConnector *conn,
+                        uint32_t *crtcs_used)
+{
+    const struct output_cfg *oc = &g.cfg.out[o->idx];
+    const char *tag = out_tag(o->idx);
+    char name[32];
+    conn_name(conn, name, sizeof name);
+    o->conn = conn->connector_id;
+
+    if (!pick_mode(conn, oc->hdmi_mode, &o->mode)) {
+        logm("%sDRM : mode « %s » introuvable sur %s. Modes disponibles :", tag, oc->hdmi_mode,
+             name);
         for (int i = 0; i < conn->count_modes; i++)
             logm("   %2d : %dx%d%s@%u", i, conn->modes[i].hdisplay, conn->modes[i].vdisplay,
                  conn->modes[i].flags & DRM_MODE_FLAG_INTERLACE ? "i" : "",
                  conn->modes[i].vrefresh);
         return -1;
     }
-    k.w = k.mode.hdisplay;
-    k.h = k.mode.vdisplay;
+    o->w = o->mode.hdisplay;
+    o->h = o->mode.vdisplay;
 
-    /* CRTC */
-    k.crtc_idx = -1;
-    for (int e = 0; e < conn->count_encoders && k.crtc_idx < 0; e++) {
-        drmModeEncoder *enc = drmModeGetEncoder(k.fd, conn->encoders[e]);
+    /* CRTC pas encore pris par une autre sortie */
+    o->crtc_idx = -1;
+    for (int e = 0; e < conn->count_encoders && o->crtc_idx < 0; e++) {
+        drmModeEncoder *enc = drmModeGetEncoder(kd.fd, conn->encoders[e]);
         if (!enc)
             continue;
         for (int i = 0; i < res->count_crtcs; i++)
-            if (enc->possible_crtcs & (1u << i)) {
-                k.crtc_idx = i;
-                k.crtc = res->crtcs[i];
+            if ((enc->possible_crtcs & (1u << i)) && !(*crtcs_used & (1u << i))) {
+                o->crtc_idx = i;
+                o->crtc = res->crtcs[i];
                 break;
             }
         drmModeFreeEncoder(enc);
     }
-    drmModeFreeConnector(conn);
-    drmModeFreeResources(res);
-    if (k.crtc_idx < 0) {
-        logm("DRM : pas de CRTC pour %s", name);
+    if (o->crtc_idx < 0) {
+        logm("%sDRM : pas de CRTC pour %s", tag, name);
         return -1;
     }
 
-    /* plans */
-    drmModePlaneRes *pr = drmModeGetPlaneResources(k.fd);
-    if (!pr)
-        return -1;
-    for (uint32_t i = 0; i < pr->count_planes && k.npl < MAX_PLANES; i++) {
-        drmModePlane *p = drmModeGetPlane(k.fd, pr->planes[i]);
-        if (!p)
-            continue;
-        if (p->possible_crtcs & (1u << k.crtc_idx)) {
-            struct plane_info *pi = &k.pl[k.npl++];
-            memset(pi, 0, sizeof *pi);
-            pi->id = p->plane_id;
-            for (uint32_t f = 0; f < p->count_formats; f++) {
-                if (p->formats[f] == DRM_FORMAT_NV12) pi->nv12 = true;
-                if (p->formats[f] == DRM_FORMAT_ARGB8888) pi->argb = true;
-            }
-            load_plane(pi);
-        }
-        drmModeFreePlane(p);
-    }
-    drmModeFreePlaneResources(pr);
-
-    k.conn_crtc_prop = obj_prop(k.conn, DRM_MODE_OBJECT_CONNECTOR, "CRTC_ID");
-    k.crtc_mode_prop = obj_prop(k.crtc, DRM_MODE_OBJECT_CRTC, "MODE_ID");
-    k.crtc_active_prop = obj_prop(k.crtc, DRM_MODE_OBJECT_CRTC, "ACTIVE");
-    if (drmModeCreatePropertyBlob(k.fd, &k.mode, sizeof k.mode, &k.mode_blob)) {
-        logm("DRM : création du blob de mode impossible");
+    o->conn_crtc_prop = obj_prop(o->conn, DRM_MODE_OBJECT_CONNECTOR, "CRTC_ID");
+    o->crtc_mode_prop = obj_prop(o->crtc, DRM_MODE_OBJECT_CRTC, "MODE_ID");
+    o->crtc_active_prop = obj_prop(o->crtc, DRM_MODE_OBJECT_CRTC, "ACTIVE");
+    if (drmModeCreatePropertyBlob(kd.fd, &o->mode, sizeof o->mode, &o->mode_blob)) {
+        logm("%sDRM : création du blob de mode impossible", tag);
         return -1;
     }
 
-    /* plan OSD provisoire : premier overlay ARGB */
-    for (int i = 0; i < k.npl && k.op < 0; i++)
-        if (k.pl[i].type == 0 && k.pl[i].argb)
-            k.op = i;
-    if (k.op < 0)
-        for (int i = 0; i < k.npl && k.op < 0; i++)
-            if (k.pl[i].argb)
-                k.op = i;
-    if (k.op < 0) {
-        logm("DRM : aucun plan ARGB8888 disponible");
+    /* plan OSD provisoire : premier overlay ARGB, sinon n'importe quel plan ARGB */
+    int nusable = 0;
+    pthread_mutex_lock(&kd.lock);
+    for (int i = 0; i < kd.npl; i++)
+        nusable += plane_usable(o, i);
+    for (int i = 0; i < kd.npl && o->op < 0; i++)
+        if (plane_usable(o, i) && kd.pl[i].type == 0 && kd.pl[i].argb)
+            o->op = i;
+    for (int i = 0; i < kd.npl && o->op < 0; i++)
+        if (plane_usable(o, i) && kd.pl[i].argb && kd.pl[i].type != 2)
+            o->op = i;
+    if (o->op >= 0)
+        kd.pl[o->op].owner = o->idx;
+    pthread_mutex_unlock(&kd.lock);
+    if (o->op < 0) {
+        logm("%sDRM : aucun plan ARGB8888 disponible", tag);
         return -1;
     }
 
     for (int i = 0; i < 2; i++)
-        if (dumb_create(&k.ov[i]) < 0) {
-            logm("DRM : création du tampon OSD impossible : %s", strerror(errno));
+        if (dumb_create(&o->ov[i], o->w, o->h) < 0) {
+            logm("%sDRM : création du tampon OSD impossible : %s", tag, strerror(errno));
             return -1;
         }
-    k.surf = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, k.w, k.h);
+    o->surf = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, o->w, o->h);
 
-    /* modeset initial : écran noir + OSD, tous les autres plans coupés */
+    /* modeset initial : écran noir + OSD ; les plans libres de ce CRTC sont coupés,
+       ceux des autres sorties ne sont pas touchés */
     drmModeAtomicReq *r = drmModeAtomicAlloc();
-    add(r, k.conn, k.conn_crtc_prop, k.crtc);
-    add(r, k.crtc, k.crtc_mode_prop, k.mode_blob);
-    add(r, k.crtc, k.crtc_active_prop, 1);
-    for (int i = 0; i < k.npl; i++)
-        if (i != k.op)
-            kms_plane_disable(r, &k.pl[i]);
-    kms_set_osd(r, k.op, k.ov[0].fb);
-    int ret = drmModeAtomicCommit(k.fd, r, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
+    add(r, o->conn, o->conn_crtc_prop, o->crtc);
+    add(r, o->crtc, o->crtc_mode_prop, o->mode_blob);
+    add(r, o->crtc, o->crtc_active_prop, 1);
+    pthread_mutex_lock(&kd.lock);
+    for (int i = 0; i < kd.npl; i++)
+        if (i != o->op && plane_usable(o, i) && kd.pl[i].owner < 0)
+            kms_plane_disable(r, &kd.pl[i]);
+    pthread_mutex_unlock(&kd.lock);
+    kms_set_osd(r, o, o->op, o->ov[0].fb);
+    int ret = drmModeAtomicCommit(kd.fd, r, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
     drmModeAtomicFree(r);
     if (ret) {
-        logm("DRM : modeset impossible : %s%s", strerror(errno),
+        logm("%sDRM : modeset impossible : %s%s", tag, strerror(errno),
              errno == EACCES ? " (un autre programme utilise l'écran ? mpv ?)" : "");
         return -1;
     }
-    k.ov_cur = 0;
-    snprintf(g.output_desc, sizeof g.output_desc, "%s %dx%d@%u", name, k.w, k.h, k.mode.vrefresh);
-    logm("DRM : %s, %d plans utilisables, OSD sur le plan %u", g.output_desc, k.npl,
-         k.pl[k.op].id);
+    *crtcs_used |= 1u << o->crtc_idx;
+    o->ov_cur = 0;
+    o->on = true;
+    struct output *out = &g.out[o->idx];
+    snprintf(out->desc, sizeof out->desc, "%s %dx%d@%u", name, o->w, o->h, o->mode.vrefresh);
+    out->connected = true;
+    logm("%sDRM : %s, %d plans utilisables, OSD sur le plan %u", tag, out->desc, nusable,
+         kd.pl[o->op].id);
     return 0;
+}
+
+int kms_init(void)
+{
+    drmModeRes *res = NULL;
+    char name[32];
+
+    for (int i = 0; i < MAX_OUTPUTS; i++) {
+        struct kms_out *o = &ko[i];
+        memset(o, 0, sizeof *o);
+        o->idx = i;
+        o->vp = o->op = o->disable_pending = -1;
+    }
+    if (open_device(&res) < 0) {
+        if (res)
+            drmModeFreeResources(res);
+        return -1;
+    }
+    load_planes();
+
+    /* connecteur de chaque sortie : d'abord les noms donnés, puis « auto » =
+       le premier écran branché qui n'est pas déjà pris */
+    drmModeConnector *conn[MAX_OUTPUTS] = { 0 };
+    for (int pass = 0; pass < 2; pass++)
+        for (int o = 0; o < g.cfg.outputs; o++) {
+            const char *want = g.cfg.out[o].connector;
+            bool is_auto = !want[0] || !strcasecmp(want, "auto");
+            if (pass != is_auto)
+                continue;
+            for (int i = 0; i < res->count_connectors && !conn[o]; i++) {
+                drmModeConnector *c = drmModeGetConnector(kd.fd, res->connectors[i]);
+                if (!c)
+                    continue;
+                bool taken = false;
+                for (int j = 0; j < g.cfg.outputs; j++)
+                    taken |= conn[j] && conn[j]->connector_id == c->connector_id;
+                conn_name(c, name, sizeof name);
+                bool match = is_auto ? c->connection == DRM_MODE_CONNECTED : !strcmp(name, want);
+                if (match && !taken && c->count_modes)
+                    conn[o] = c;
+                else
+                    drmModeFreeConnector(c);
+            }
+            if (!conn[o])
+                logm("%sDRM : pas d'écran (connecteur « %s » introuvable, déjà pris ou sans mode)",
+                     out_tag(o), want);
+        }
+
+    uint32_t crtcs_used = 0;
+    int on = 0;
+    for (int o = 0; o < g.cfg.outputs; o++) {
+        if (!conn[o])
+            continue;
+        if (output_setup(&ko[o], res, conn[o], &crtcs_used) == 0)
+            on++;
+        else if (ko[o].op >= 0) {
+            pthread_mutex_lock(&kd.lock);
+            kd.pl[ko[o].op].owner = -1;
+            pthread_mutex_unlock(&kd.lock);
+        }
+        drmModeFreeConnector(conn[o]);
+    }
+    if (!on)
+        list_connectors(res);
+    drmModeFreeResources(res);
+    return on ? 0 : -1;
 }
 
 void kms_close(void)
 {
-    if (k.fd < 0)
+    if (kd.fd < 0)
         return;
-    for (int i = 0; i < 2; i++)
-        dumb_destroy(&k.ov[i]);
-    if (k.surf)
-        cairo_surface_destroy(k.surf);
-    if (k.mode_blob)
-        drmModeDestroyPropertyBlob(k.fd, k.mode_blob);
-    close(k.fd);
-    k.fd = -1;
+    for (int o = 0; o < MAX_OUTPUTS; o++) {
+        for (int i = 0; i < 2; i++)
+            dumb_destroy(&ko[o].ov[i]);
+        if (ko[o].surf)
+            cairo_surface_destroy(ko[o].surf);
+        ko[o].surf = NULL;
+        if (ko[o].mode_blob)
+            drmModeDestroyPropertyBlob(kd.fd, ko[o].mode_blob);
+        ko[o].mode_blob = 0;
+    }
+    close(kd.fd);
+    kd.fd = -1;
 }
 
-/* crée un framebuffer DRM à partir d'une image DRM PRIME (zéro copie) */
 int fb_from_frame(const AVFrame *f, uint32_t *fb)
 {
     const AVDRMFrameDescriptor *d = (const AVDRMFrameDescriptor *)f->data[0];
@@ -425,8 +510,9 @@ int fb_from_frame(const AVFrame *f, uint32_t *fb)
 
     if (!d || d->nb_layers < 1)
         return -1;
+    pthread_mutex_lock(&kd.lock);
     for (int i = 0; i < d->nb_objects; i++)
-        if (drmPrimeFDToHandle(k.fd, d->objects[i].fd, &bo[i])) {
+        if (drmPrimeFDToHandle(kd.fd, d->objects[i].fd, &bo[i])) {
             logm("DRM : import dmabuf impossible : %s", strerror(errno));
             goto out;
         }
@@ -448,7 +534,7 @@ int fb_from_frame(const AVFrame *f, uint32_t *fb)
         logm("DRM : images %dx%d format %.4s modificateur 0x%016llx", f->width, f->height,
              (const char *)&L->format, (unsigned long long)mods[0]);
     }
-    if (drmModeAddFB2WithModifiers(k.fd, f->width, f->height, L->format, handles, pitches,
+    if (drmModeAddFB2WithModifiers(kd.fd, f->width, f->height, L->format, handles, pitches,
                                    offsets, usemod ? mods : NULL, fb,
                                    usemod ? DRM_MODE_FB_MODIFIERS : 0)) {
         logm("DRM : AddFB2 refusé : %s", strerror(errno));
@@ -465,67 +551,76 @@ out:
             dup |= bo[j] == bo[i];
         if (!dup) {
             struct drm_gem_close gc = { .handle = bo[i] };
-            drmIoctl(k.fd, DRM_IOCTL_GEM_CLOSE, &gc);
+            drmIoctl(kd.fd, DRM_IOCTL_GEM_CLOSE, &gc);
         }
     }
+    pthread_mutex_unlock(&kd.lock);
     return ret;
 }
 
-static bool vplane_allowed(int i)
+static bool vplane_allowed(const struct kms_out *o, int i)
 {
-    const char *v = g.cfg.video_plane;
-    if (!k.pl[i].nv12)
+    const char *v = g.cfg.out[o->idx].video_plane;
+    if (!kd.pl[i].nv12 || !plane_usable(o, i))
         return false;
     if (!strcasecmp(v, "primary"))
-        return k.pl[i].type == 1;
+        return kd.pl[i].type == 1;
     if (!strcasecmp(v, "overlay"))
-        return k.pl[i].type == 0;
+        return kd.pl[i].type == 0;
     if (isdigit((unsigned char)v[0]))
-        return k.pl[i].id == (uint32_t)atoi(v);
-    return k.pl[i].type != 2;
+        return kd.pl[i].id == (uint32_t)atoi(v);
+    return kd.pl[i].type != 2;
 }
 
-/* au premier affichage : cherche (TEST_ONLY) une paire de plans vidéo/OSD acceptée */
-int kms_pick_planes(uint32_t fb, const AVFrame *f)
+int kms_pick_planes(struct kms_out *o, uint32_t fb, const AVFrame *f)
 {
+    const char *tag = out_tag(o->idx);
     int order[MAX_PLANES], n = 0;
+    pthread_mutex_lock(&kd.lock);
     for (int pass = 0; pass < 2; pass++)          /* primaire d'abord, puis overlays */
-        for (int i = 0; i < k.npl; i++)
-            if (vplane_allowed(i) && ((pass == 0) == (k.pl[i].type == 1)))
+        for (int i = 0; i < kd.npl; i++)
+            if (vplane_allowed(o, i) && ((pass == 0) == (kd.pl[i].type == 1)))
                 order[n++] = i;
     for (int a = 0; a < n; a++) {
         int vp = order[a];
         int ocand[MAX_PLANES], no = 0;
-        if (k.op != vp)
-            ocand[no++] = k.op;
-        for (int i = 0; i < k.npl; i++)
-            if (i != vp && i != k.op && k.pl[i].argb && k.pl[i].type != 2)
+        if (o->op != vp)
+            ocand[no++] = o->op;
+        for (int i = 0; i < kd.npl; i++)
+            if (i != vp && i != o->op && kd.pl[i].argb && kd.pl[i].type != 2 &&
+                plane_usable(o, i))
                 ocand[no++] = i;
         for (int b = 0; b < no; b++) {
             int op = ocand[b];
             drmModeAtomicReq *r = drmModeAtomicAlloc();
-            kms_set_video(r, vp, fb, f);
-            kms_set_osd(r, op, k.ov[k.ov_cur].fb);
-            if (op != k.op)
-                kms_plane_disable(r, &k.pl[k.op]);
-            int ret = drmModeAtomicCommit(k.fd, r, DRM_MODE_ATOMIC_TEST_ONLY, NULL);
+            kms_set_video(r, o, vp, fb, f);
+            kms_set_osd(r, o, op, o->ov[o->ov_cur].fb);
+            /* old OSD plane switched off, unless it becomes the video plane */
+            if (op != o->op && o->op != vp)
+                kms_plane_disable(r, &kd.pl[o->op]);
+            int ret = drmModeAtomicCommit(kd.fd, r, DRM_MODE_ATOMIC_TEST_ONLY, NULL);
             int err = errno;
             drmModeAtomicFree(r);
-            logm("DRM : essai vidéo=plan %u (%s) + OSD=plan %u : %s", k.pl[vp].id,
-                 k.pl[vp].type == 1 ? "primary" : "overlay", k.pl[op].id,
+            logm("%sDRM : essai vidéo=plan %u (%s) + OSD=plan %u : %s", tag, kd.pl[vp].id,
+                 kd.pl[vp].type == 1 ? "primary" : "overlay", kd.pl[op].id,
                  ret ? strerror(err) : "OK");
             if (!ret) {
-                if (op != k.op) {
-                    k.disable_pending = k.op;
-                    k.op = op;
-                    k.osd_force = true;
+                if (op != o->op) {
+                    /* l'ancien plan OSD reste à cette sortie jusqu'à sa coupure */
+                    if (o->op != vp)
+                        o->disable_pending = o->op;
+                    o->op = op;
+                    o->osd_force = true;
                 }
-                k.vp = vp;
-                k.video_ok = true;
+                kd.pl[vp].owner = kd.pl[op].owner = o->idx;
+                o->vp = vp;
+                o->video_ok = true;
+                pthread_mutex_unlock(&kd.lock);
                 return 0;
             }
         }
     }
-    logm("DRM : aucun plan n'accepte ces images (voir video_plane dans la config)");
+    pthread_mutex_unlock(&kd.lock);
+    logm("%sDRM : aucun plan n'accepte ces images (voir video_plane dans la config)", tag);
     return -1;
 }

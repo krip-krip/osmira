@@ -26,12 +26,16 @@ void config_defaults(void)
     c->hwaccel_device[0] = 0;
     c->extra_hw_frames = 2;
     strcpy(c->drm_device, "auto");
-    strcpy(c->connector, "HDMI-A-1");
-    strcpy(c->hdmi_mode, "1920x1080@50");
-    strcpy(c->video_plane, "auto");
     c->http_port = 8080;
     c->cameras = 4;
-    c->start_camera = 1;
+    c->outputs = 1;
+    for (int i = 0; i < MAX_OUTPUTS; i++) {
+        struct output_cfg *o = &c->out[i];
+        strcpy(o->connector, i ? "auto" : "HDMI-A-1");
+        strcpy(o->hdmi_mode, "1920x1080@50");
+        strcpy(o->video_plane, "auto");
+        o->start_camera = 1;
+    }
     strcpy(c->font, "DejaVu Sans");
     c->umd_off_alpha = 0.30;
     c->stats_interval_s = 10;
@@ -80,15 +84,31 @@ int parse_tally(const char *s)
 #define CFG_DBL(name) if (!strcmp(k, #name)) { c->name = atof(v); return 0; }
 #define CFG_STR(name) if (!strcmp(k, #name)) { snprintf(c->name, sizeof c->name, "%s", v); return 0; }
 
+/* Keys of one output: in [general] for output 1, in [outputN] for output N. */
+static int set_output(struct output_cfg *c, const char *k, const char *v)
+{
+    CFG_STR(connector) CFG_STR(hdmi_mode) CFG_STR(video_plane) CFG_INT(start_camera)
+    return -1;
+}
+
 static int set_general(const char *k, const char *v)
 {
     struct config *c = &g.cfg;
     CFG_INT(srt_latency_ms) CFG_INT(connect_timeout_ms) CFG_INT(stall_timeout_ms)
     CFG_INT(reconnect_ms) CFG_STR(hwaccel) CFG_STR(hwaccel_device) CFG_INT(extra_hw_frames)
-    CFG_STR(drm_device) CFG_STR(connector) CFG_STR(hdmi_mode) CFG_STR(video_plane)
-    CFG_INT(cameras) CFG_INT(http_port) CFG_INT(start_camera) CFG_STR(font)
+    CFG_STR(drm_device) CFG_INT(cameras) CFG_INT(outputs) CFG_INT(http_port) CFG_STR(font)
     CFG_DBL(umd_off_alpha) CFG_INT(stats_interval_s) CFG_INT(rt_priority) CFG_STR(loglevel)
-    return -1;
+    return set_output(&c->out[0], k, v);
+}
+
+/* N of a [outputN] section (1..MAX_OUTPUTS), 0 if the section is not one. */
+static int output_section(const char *sect)
+{
+    char *end;
+    if (strncmp(sect, "output", 6) || !isdigit((unsigned char)sect[6]))
+        return 0;
+    long n = strtol(sect + 6, &end, 10);
+    return !*end && n >= 1 && n <= MAX_OUTPUTS ? (int)n : 0;
 }
 
 /* N of a [camN] section (1..MAX_CAMS), 0 if the section is not one. */
@@ -105,7 +125,7 @@ int load_config(const char *path)
 {
     FILE *f = fopen(path, "r");
     char line[1024], sect[32] = "";
-    int ln = 0, last_cam = 0;
+    int ln = 0, last_cam = 0, last_out = 0;
     if (!f) {
         logm("config : impossible d'ouvrir %s : %s", path, strerror(errno));
         return -1;
@@ -132,6 +152,12 @@ int load_config(const char *path)
         unquote(v);
         if (!strcmp(sect, "general")) {
             if (set_general(k, v) < 0)
+                logm("config:%d : clé inconnue « %s »", ln, k);
+        } else if (output_section(sect)) {
+            int n = output_section(sect);
+            if (n > last_out)
+                last_out = n;
+            if (set_output(&g.cfg.out[n - 1], k, v) < 0)
                 logm("config:%d : clé inconnue « %s »", ln, k);
         } else if (cam_section(sect)) {
             int n = cam_section(sect);
@@ -165,7 +191,17 @@ int load_config(const char *path)
     if (last_cam > g.cfg.cameras)
         logm("config : sections [cam%d] à [cam%d] ignorées (cameras = %d)", g.cfg.cameras + 1,
              last_cam, g.cfg.cameras);
-    if (g.cfg.start_camera < 1 || g.cfg.start_camera > g.cfg.cameras)
-        g.cfg.start_camera = 1;
+    if (g.cfg.outputs < 1 || g.cfg.outputs > MAX_OUTPUTS) {
+        int n = g.cfg.outputs < 1 ? 1 : MAX_OUTPUTS;
+        logm("config : outputs = %d hors limites (1 à %d) : %d sorties", g.cfg.outputs,
+             MAX_OUTPUTS, n);
+        g.cfg.outputs = n;
+    }
+    if (last_out > g.cfg.outputs)
+        logm("config : sections [output%d] à [output%d] ignorées (outputs = %d)",
+             g.cfg.outputs + 1, last_out, g.cfg.outputs);
+    for (int i = 0; i < MAX_OUTPUTS; i++)
+        if (g.cfg.out[i].start_camera < 1 || g.cfg.out[i].start_camera > g.cfg.cameras)
+            g.cfg.out[i].start_camera = 1;
     return 0;
 }

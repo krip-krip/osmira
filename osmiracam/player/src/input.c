@@ -92,7 +92,7 @@ static void publish_frame(struct cam *c, AVFrame *frm)
     c->last_frame_us = now_us();
     c->width = c->latest->width;
     c->height = c->latest->height;
-    bool wake = (c->idx == g.selected) || c->state != ST_STREAMING;
+    bool wake = input_shown(c->idx) || c->state != ST_STREAMING;
     c->state = ST_STREAMING;
     if (wake)
         pthread_cond_broadcast(&g.cond);
