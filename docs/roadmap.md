@@ -49,7 +49,9 @@ affichée depuis le Core. Pas de pilotage PTZ à cette étape.
   station).
 - [x] `ptzview` : changement d'une entrée à chaud (`/input/N`), entrées
   désactivées ; l'agent ne touche que les entrées modifiées.
+- [x] `ptzview` découpé en modules, indépendant du matériel (ADR 0014).
 - [ ] `ptzview` : nombre de caméras configurable.
+- [ ] `ptzview` : deuxième sortie HDMI, plus de 4 flux (selon le matériel).
 - [ ] Tally/UMD par SSE.
 
 ## Étape 4 — Pilotage PTZ (plus tard ; prévu dans le modèle)

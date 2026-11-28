@@ -11,7 +11,7 @@ class PtzviewSettings:
     binary: Path
     conf_path: Path
     http_port: int = 8081
-    # Inputs of ptzview: fixed at 4 for now (NCAM in ptzview.c).
+    # Inputs of ptzview: fixed at 4 for now (NCAM in player/src/ptzview.h).
     slots: int = 4
     stop_timeout_s: float = 5.0
     restart_delay_s: float = 2.0
