@@ -124,9 +124,12 @@ ligne par poste (`camera_id` vide : température, CMA libre). Champs : `ts`,
 `station_id`, `camera_id`, `via_server_id` et `via_path` (comment la caméra
 arrivait à ce moment ; vides = en direct), `state`, `fps`, `mbps`, `width`,
 `height`, `connects`, `decode_errors` (cumulés depuis le lancement du lecteur),
-`temp_c`, `cma_free_mb`. Purgé avec les relevés SRT (7 jours). C'est la seule
-source de statistiques des liaisons directes pour l'instant (les vraies stats
-SRT côté poste demanderont une évolution de `ptzview`).
+SRT vu par le poste (ADR 0013, cumulés depuis la connexion) : `srt_rtt_ms`,
+`srt_mbps`, `srt_bandwidth_mbps`, `srt_latency_ms`, `srt_buffer_ms`,
+`srt_packets`, `srt_lost`, `srt_retrans`, `srt_dropped`, `srt_belated` ;
+`temp_c`, `cma_free_mb`. Purgé avec les relevés SRT (7 jours). Seule source
+de statistiques des liaisons directes ; pour les liaisons par un serveur
+média, complète la vue de l'émetteur (MediaMTX).
 
 ## StationMetric (mesures système d'un poste)
 

@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from osmiracore.models import Camera, Station, StationMetric, StationSample, StationStatus
-from osmiracore.schemas import ReceivedMedia, StationStatusIn, StationStatusOut
+from osmiracore.schemas import PlayerSrt, ReceivedMedia, StationStatusIn, StationStatusOut
 from osmiracore.services import config, stations
 
 
@@ -42,6 +42,7 @@ def _store_samples(session: Session, station_id: str, data: StationStatusIn, ts:
     )
     for cam in data.player.cameras:
         camera = session.get(Camera, cam.camera_id)
+        srt = cam.srt or PlayerSrt()
         session.add(
             StationSample(
                 ts=ts,
@@ -56,6 +57,16 @@ def _store_samples(session: Session, station_id: str, data: StationStatusIn, ts:
                 height=cam.height,
                 connects=cam.connects,
                 decode_errors=cam.decode_errors,
+                srt_rtt_ms=srt.rtt_ms,
+                srt_mbps=srt.recv_mbps,
+                srt_bandwidth_mbps=srt.bandwidth_mbps,
+                srt_latency_ms=srt.latency_ms,
+                srt_buffer_ms=srt.buffer_ms,
+                srt_packets=srt.packets,
+                srt_lost=srt.lost,
+                srt_retrans=srt.retrans,
+                srt_dropped=srt.dropped,
+                srt_belated=srt.belated,
             )
         )
 

@@ -233,6 +233,22 @@ class LenientModel(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 
+class PlayerSrt(LenientModel):
+    """SRT figures seen by the station (receiver side, ADR 0013). Counters
+    are cumulative since the connection started."""
+
+    rtt_ms: float | None = None
+    recv_mbps: float | None = None
+    bandwidth_mbps: float | None = None
+    latency_ms: int | None = None  # negotiated with the sender
+    buffer_ms: int | None = None
+    packets: int | None = None
+    lost: int | None = None
+    retrans: int | None = None
+    dropped: int | None = None  # never arrived in time: picture damage
+    belated: int | None = None
+
+
 class PlayerCamera(LenientModel):
     camera_id: str
     state: str | None = None
@@ -243,6 +259,7 @@ class PlayerCamera(LenientModel):
     connects: int | None = None
     decode_errors: int | None = None
     last_error: str | None = None
+    srt: PlayerSrt | None = None  # None: not connected, or an older player
 
 
 class PlayerStatus(LenientModel):
@@ -407,6 +424,15 @@ class LinkSummary(StrictModel):
     rtt_avg_ms: float | None
     rtt_max_ms: float | None
     mbps_avg: float | None
+    # SRT seen by the station (receiver side, ADR 0013); None when the
+    # station does not report it (camera -> server links, older players).
+    station_packets: int | None
+    station_lost: int | None
+    station_retrans: int | None
+    station_dropped: int | None
+    station_loss_percent: float | None
+    station_rtt_avg_ms: float | None
+    station_latency_ms: int | None  # last negotiated SRT latency
     # What the station reports (None for camera -> server links).
     fps_avg: float | None
     fps_min: float | None
@@ -429,6 +455,11 @@ class LinkSeries(StrictModel):
     fps: list[float | None]
     station_mbps: list[float | None]
     decode_errors: list[int | None]
+    # SRT seen by the station (receiver side).
+    station_rtt_ms: list[float | None]
+    station_loss_percent: list[float | None]
+    station_retrans_per_s: list[float | None]
+    station_dropped: list[int | None]
 
 
 class StationMetricsSeries(StrictModel):
@@ -444,7 +475,7 @@ class StationMetricsSeries(StrictModel):
     series: dict[str, list[float | None]]
     # interface -> rx_mbps, tx_mbps, rx_dropped, errors
     net: dict[str, dict[str, list[float | None]]]
-    # camera -> fps, decode_errors
+    # camera -> fps, decode_errors, srt_dropped, srt_loss_percent
     cameras: dict[str, dict[str, list[float | None]]]
     # Latest row (None if the station never sent figures) and its age.
     latest: dict[str, Any] | None

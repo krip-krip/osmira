@@ -166,7 +166,7 @@ class SrtSample(Base):
 class StationSample(Base):
     """What a station reports about each stream it receives, every few seconds
     (from its status). Gives the receiver side of every link, and the only
-    statistics of direct camera -> station links for now.
+    statistics of direct camera -> station links.
 
     camera_id None: station-wide figures (temperature, free CMA).
     """
@@ -191,6 +191,18 @@ class StationSample(Base):
     height: Mapped[int | None]
     connects: Mapped[int | None]  # cumulative since the player started
     decode_errors: Mapped[int | None]  # cumulative since the player started
+    # SRT seen by the station (receiver side, ADR 0013); counters cumulative
+    # since the connection started (a new connection: connects changes).
+    srt_rtt_ms: Mapped[float | None]
+    srt_mbps: Mapped[float | None]
+    srt_bandwidth_mbps: Mapped[float | None]
+    srt_latency_ms: Mapped[int | None]
+    srt_buffer_ms: Mapped[int | None]
+    srt_packets: Mapped[int | None]
+    srt_lost: Mapped[int | None]
+    srt_retrans: Mapped[int | None]
+    srt_dropped: Mapped[int | None]  # too late to be played: picture damage
+    srt_belated: Mapped[int | None]
     temp_c: Mapped[float | None]
     cma_free_mb: Mapped[float | None]
 

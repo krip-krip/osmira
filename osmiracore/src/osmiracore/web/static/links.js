@@ -16,14 +16,32 @@
     label, scale, side, stroke: C.text, grid: { stroke: C.grid, width: 1, show: side === 3 },
     ticks: { stroke: C.grid },
   });
-  const series = (label, stroke, scale) => ({ label, stroke, width: 1.5, scale, spanGaps: false });
+  const series = (label, stroke, scale, dash) => ({ label, stroke, width: 1.5, scale, spanGaps: false, dash });
+  // Media server side (solid) and station side (dashed) of a link: a camera ->
+  // server link has only the first, a direct camera -> station link only the
+  // second, a server -> station link both.
+  const kind = root.dataset.kind;
+  const server = kind !== "camera_station";
+  const station = kind !== "camera_server";
+  const both = (a, b) => [...(server ? [a] : []), ...(station ? [b] : [])];
+  const DASH = [5, 4];
 
   const charts = {
-    rtt: { series: [series("RTT ms", C.a, "y")], axes: [axis("ms")], data: (d) => [d.rtt_ms] },
+    rtt: {
+      series: both(series("media server RTT ms", C.a, "y"), series("station RTT ms", C.a, "y", DASH)),
+      axes: [axis("ms")],
+      data: (d) => both(d.rtt_ms, d.station_rtt_ms),
+    },
     loss: {
-      series: [series("loss %", C.d, "y"), series("retrans/s", C.b, "r")],
+      series: [
+        ...both(series("media server loss %", C.d, "y"), series("station loss %", C.d, "y", DASH)),
+        ...both(series("media server retrans/s", C.b, "r"), series("station retrans/s", C.b, "r", DASH)),
+      ],
       axes: [axis("%"), axis("/s", "r", 1)],
-      data: (d) => [d.loss_percent, d.retrans_per_s],
+      data: (d) => [
+        ...both(d.loss_percent, d.station_loss_percent),
+        ...both(d.retrans_per_s, d.station_retrans_per_s),
+      ],
     },
     mbps: {
       series: root.dataset.kind === "camera_station"
@@ -37,7 +55,11 @@
       axes: [axis("fps"), axis("errors", "e", 1)],
       data: (d) => [d.fps, d.decode_errors],
     },
-    dropped: { series: [series("dropped", C.d, "y")], axes: [axis("packets")], data: (d) => [d.dropped] },
+    dropped: {
+      series: both(series("media server dropped", C.d, "y"), series("station dropped", C.d, "y", DASH)),
+      axes: [axis("packets")],
+      data: (d) => both(d.dropped, d.station_dropped),
+    },
   };
 
   const plots = {};

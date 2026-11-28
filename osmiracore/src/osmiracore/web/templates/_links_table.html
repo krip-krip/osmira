@@ -1,5 +1,13 @@
 {%- macro cam(id) -%}{{ names.camera.get(id, id) if id else "unknown camera" }}{%- endmacro -%}
 {%- macro srv(id) -%}{{ names.server.get(id, id) }}{%- endmacro -%}
+{#- Sender value (media server), then what the station saw as a second line;
+    a direct link only has the station's figures. -#}
+{%- macro both(a, b, digits=1, unit="") -%}
+  {%- if a is not none -%}{{ a|num(digits) }}{{ unit }}
+    {%- if b is not none %}<span class="sub" title="Seen by the station">station {{ b|num(digits) }}{{ unit }}</span>{% endif -%}
+  {%- elif b is not none -%}{{ b|num(digits) }}{{ unit }}<span class="sub">station</span>
+  {%- else -%}–{%- endif -%}
+{%- endmacro -%}
 {%- macro stn(id) -%}{% if id and id.startswith("?") %}unknown reader {{ id[1:] }}{% else %}{{ id }}{% endif %}{%- endmacro -%}
 {#- Reloaded every 10 s when the period runs up to now. -#}
 <div id="links" {% if live %}hx-get="/links/table?{{ period.query }}" hx-trigger="every 10s" hx-swap="outerHTML"{% endif %}>
@@ -12,7 +20,8 @@
       <tr>
         <th>Link</th><th>State</th><th>Duration</th>
         <th title="SRT connections in the period">Conn.</th>
-        <th>Loss</th><th>Retrans.</th><th title="Packets too late to be played">Dropped</th>
+        <th title="Media server, then seen by the station">Loss</th><th>Retrans.</th>
+        <th title="Packets too late to be played: picture damaged">Dropped</th>
         <th>RTT avg / max</th><th>Mb/s</th>
         <th title="Frames per second at the station">Fps avg / min</th>
         <th>No picture</th><th>Decode err.</th><th>Reconn.</th>
@@ -38,13 +47,16 @@
         </td>
         <td>{{ x.duration_s|duration }}</td>
         <td>{{ x.connections|num }}</td>
-        <td class="{{ 'warn' if x.loss_percent and x.loss_percent > 1 }}">
-          {% if x.loss_percent is not none %}{{ x.loss_percent|num(2) }} %{% else %}–{% endif %}
-          {% if x.packets_lost %}<span class="sub">{{ x.packets_lost|num }} pkts</span>{% endif %}
+        <td class="{{ 'warn' if (x.loss_percent or 0) > 1 or (x.station_loss_percent or 0) > 1 }}">
+          {{ both(x.loss_percent, x.station_loss_percent, 2, " %") }}
         </td>
-        <td>{{ x.packets_retrans|num }}</td>
-        <td class="{{ 'bad' if x.packets_dropped }}">{{ x.packets_dropped|num }}</td>
-        <td>{{ x.rtt_avg_ms|num }} / {{ x.rtt_max_ms|num }}</td>
+        <td>{{ both(x.packets_retrans, x.station_retrans) }}</td>
+        <td class="{{ 'bad' if x.packets_dropped or x.station_dropped }}">{{ both(x.packets_dropped, x.station_dropped) }}</td>
+        <td>
+          {%- if x.rtt_avg_ms is not none %}{{ x.rtt_avg_ms|num }} / {{ x.rtt_max_ms|num }}{% endif %}
+          {%- if x.station_rtt_avg_ms is not none %}<span class="sub" title="Average seen by the station; negotiated SRT latency">station {{ x.station_rtt_avg_ms|num }} · lat. {{ x.station_latency_ms|num }} ms</span>{% endif %}
+          {%- if x.rtt_avg_ms is none and x.station_rtt_avg_ms is none %}–{% endif -%}
+        </td>
         <td>{{ x.mbps_avg|num }}</td>
         <td class="{{ 'warn' if x.fps_min is not none and x.fps_min < 45 }}">{{ x.fps_avg|num }} / {{ x.fps_min|num }}</td>
         <td class="{{ 'bad' if x.no_picture_s }}">{{ x.no_picture_s|duration if x.no_picture_s is not none else "–" }}</td>

@@ -45,7 +45,7 @@ affichée depuis le Core. Pas de pilotage PTZ à cette étape.
 - [ ] Sessions de mesure (protégées de la purge) et export CSV.
 - [x] `ptzview` : publier les stats SRT côté réception (ADR 0013), remontées
   par l'agent.
-- [ ] Core : stocker et afficher les stats SRT côté réception (pages Links,
+- [x] Core : stocker et afficher les stats SRT côté réception (pages Links,
   station).
 - [x] `ptzview` : changement d'une entrée à chaud (`/input/N`), entrées
   désactivées ; l'agent ne touche que les entrées modifiées.

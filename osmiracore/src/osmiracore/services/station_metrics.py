@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from osmiracore.models import StationMetric, StationSample
 from osmiracore.schemas import StationMetricsSeries
+from osmiracore.services.links import counter_delta, station_srt_delta
 
 DEFAULT_POINTS = 600
 UNDER_VOLTAGE = 0x1
@@ -166,21 +167,37 @@ def _camera_series(
     ).all()
     fps: dict[str, list[list[float]]] = {}
     errors: dict[str, list[float | None]] = {}
-    last: dict[str, int | None] = {}
+    dropped: dict[str, list[float | None]] = {}
+    lost: dict[str, list[int]] = {}
+    packets: dict[str, list[int]] = {}
+    prev: dict[str, StationSample] = {}
     for row in rows:
         cam = row.camera_id or ""
         i = int((row.ts - since) // bucket)
         fps.setdefault(cam, [[] for _ in range(count)])[i].append(row.fps or 0.0)
         errs = errors.setdefault(cam, [None] * count)
-        before = last.get(cam)
-        if before is not None and row.decode_errors is not None:
-            delta = row.decode_errors - before if row.decode_errors >= before else row.decode_errors
-            errs[i] = (errs[i] or 0) + delta
-        last[cam] = row.decode_errors
+        drops = dropped.setdefault(cam, [None] * count)
+        cam_lost = lost.setdefault(cam, [0] * count)
+        cam_packets = packets.setdefault(cam, [0] * count)
+        before = prev.get(cam)
+        if before is not None:
+            if row.decode_errors is not None and before.decode_errors is not None:
+                errs[i] = (errs[i] or 0) + counter_delta(row.decode_errors, before.decode_errors)
+            d = station_srt_delta(row, before)
+            if d is not None:
+                drops[i] = (drops[i] or 0) + d.dropped
+                cam_lost[i] += d.lost
+                cam_packets[i] += d.packets
+        prev[cam] = row
     return {
         cam: {
             "fps": [_round(sum(c) / len(c)) if c else None for c in cells],
             "decode_errors": errors[cam],
+            "srt_dropped": dropped[cam],
+            "srt_loss_percent": [
+                _round(100 * x / pk) if pk else (0.0 if drop is not None else None)
+                for x, pk, drop in zip(lost[cam], packets[cam], dropped[cam], strict=True)
+            ],
         }
         for cam, cells in sorted(fps.items())
     }
