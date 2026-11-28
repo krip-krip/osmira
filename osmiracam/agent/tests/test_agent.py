@@ -20,6 +20,11 @@ pytestmark = pytest.mark.anyio
 TWO_CAMS = [("cam1", 1, True), ("cam2", 2, True)]
 
 
+def two_outputs(config: dict) -> dict:
+    config["station"]["outputs"] = 2
+    return config
+
+
 class FakeCore:
     """Serves a configuration that tests can change, an event stream tests can
     feed, or pretends to be down."""
@@ -71,7 +76,8 @@ class FakePtzview:
     """ptzview's local HTTP API: records switches, can be down (restarting)."""
 
     def __init__(self) -> None:
-        self.selects: list[int] = []
+        self.selects: list[int] = []  # output 1
+        self.output_selects: list[tuple[int, int]] = []  # (output, slot), outputs 2..
         self.inputs: list[tuple[int, str, int]] = []  # (slot, url, latency) set live
         self.labels: list[tuple[int, str]] = []
         self.down = False
@@ -91,6 +97,8 @@ class FakePtzview:
             self.inputs.append((slot, form["url"], int(form["latency_ms"])))
         elif path.startswith("/label/"):
             self.labels.append((slot, form["text"]))
+        elif path.startswith("/output/"):
+            self.output_selects.append((int(path.split("/")[2]), slot))
         else:
             self.selects.append(slot)
         return httpx2.Response(200, json={})
@@ -115,10 +123,15 @@ def ptz_cam(n: int, fps: float) -> dict:
     }
 
 
-# ptzview /status with cam2 on screen; inputs 3 and 4 are free.
+# ptzview /status with cam2 on screen; inputs 3 and 4 are free; output 2 has
+# no screen and keeps input 1.
 PTZVIEW_STATUS = {
     "ok": True,
     "active": 2,
+    "outputs": [
+        {"output": 1, "connected": True, "screen": "HDMI-A-1 1920x1080@50", "active": 2},
+        {"output": 2, "connected": False, "screen": None, "active": 1},
+    ],
     "cameras": [ptz_cam(1, 49.9), ptz_cam(2, 50.0), ptz_cam(3, 0), ptz_cam(4, 0)],
     "system": {
         "mem_available_kb": 461728,
@@ -280,7 +293,7 @@ async def test_inputs_survive_an_agent_restart(settings):
 
 async def test_core_down_at_boot_uses_local_copies(settings):
     ConfigStore(settings.state_dir).save(core_config(TWO_CAMS))
-    SelectionStore(settings.state_dir).save("cam2")
+    SelectionStore(settings.state_dir).save({1: "cam2"})
     spawner = FakeSpawner()
     agent = make_agent(settings, FakeCore(None), spawner)
 
@@ -330,7 +343,7 @@ async def test_select_event_switches_ptzview(settings):
     await agent.on_event(CoreEvent("select", {"output": 1, "camera_id": "cam2"}))
 
     await until(lambda: ptzview.selects == [2])
-    assert SelectionStore(settings.state_dir).load() == "cam2"
+    assert SelectionStore(settings.state_dir).load() == {1: "cam2"}
 
 
 async def test_select_null_shows_first_viewable_camera(settings):
@@ -353,6 +366,61 @@ async def test_other_outputs_are_ignored(settings):
     await asyncio.sleep(0.05)
 
     assert ptzview.selects == []
+
+
+async def test_each_output_shows_its_camera(settings):
+    ptzview = FakePtzview()
+    core = FakeCore(two_outputs(core_config(TWO_CAMS)))
+    agent = make_agent(settings, core, FakeSpawner(), ptzview)
+    await agent.refresh()
+
+    await agent.on_event(CoreEvent("select", {"output": 2, "camera_id": "cam2"}))
+    await agent.on_event(CoreEvent("select", {"output": 1, "camera_id": "cam1"}))
+
+    await until(lambda: ptzview.output_selects == [(2, 2)] and ptzview.selects == [1])
+    assert SelectionStore(settings.state_dir).load() == {1: "cam1", 2: "cam2"}
+    assert agent.shown_slots == {1: 1, 2: 2}
+
+
+async def test_state_event_selects_every_output(settings):
+    ptzview = FakePtzview()
+    agent = make_agent(
+        settings, FakeCore(two_outputs(core_config(TWO_CAMS))), FakeSpawner(), ptzview
+    )
+    await agent.refresh()
+
+    selections = [{"output": 1, "camera_id": "cam2"}, {"output": 2, "camera_id": "cam1"}]
+    await agent.on_event(
+        CoreEvent("state", {"config_version": "sha256:v1", "selections": selections})
+    )
+
+    await until(lambda: ptzview.selects[-1:] == [2] and ptzview.output_selects[-1:] == [(2, 1)])
+
+
+async def test_each_output_starts_on_its_stored_camera(settings):
+    ConfigStore(settings.state_dir).save(two_outputs(core_config(TWO_CAMS)))
+    SelectionStore(settings.state_dir).save({1: "cam2", 2: "cam1"})
+    agent = make_agent(settings, FakeCore(None), FakeSpawner())
+
+    await agent.start()
+
+    text = settings.ptzview.conf_path.read_text()
+    assert "outputs = 2" in text
+    assert "start_camera = 2\n" in text.split("[output2]")[0]
+    assert "start_camera = 1\n" in text.split("[output2]")[1].split("[cam1]")[0]
+
+
+async def test_more_outputs_restart_ptzview(settings):
+    core = FakeCore(core_config(TWO_CAMS))
+    spawner = FakeSpawner()
+    agent = make_agent(settings, core, spawner)
+    await agent.refresh()
+    await until(lambda: len(spawner.processes) == 1)
+
+    core.config = two_outputs(core_config(TWO_CAMS, version="sha256:v2"))
+    assert await agent.refresh() is True
+
+    await until(lambda: len(spawner.processes) == 2)  # outputs are read at start only
 
 
 async def test_select_waits_for_ptzview_to_be_ready(settings):
@@ -467,6 +535,22 @@ async def test_status_maps_ptzview_inputs_to_cameras(settings):
     assert cams[0]["srt"]["lost"] == 4  # receiver-side SRT figures passed through
     assert status["system"]["cma_free_mb"] == 71
     assert status["system"]["temp_c"] == 51.6
+    assert status["player"]["outputs"] == [
+        {
+            "output": 1,
+            "connected": True,
+            "screen": "HDMI-A-1 1920x1080@50",
+            "selected_camera": None,
+            "shown_camera": "cam2",
+        },
+        {
+            "output": 2,
+            "connected": False,
+            "screen": None,
+            "selected_camera": None,
+            "shown_camera": "cam1",
+        },
+    ]
 
 
 async def test_run_reports_status_regularly(settings):

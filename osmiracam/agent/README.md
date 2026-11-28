@@ -9,13 +9,16 @@ Programme Python qui tourne sur le Raspberry Pi à côté de `ptzview` :
 3. lance `ptzview`, le relance s'il s'arrête, et le relance quand la
    configuration change ;
 4. suit le flux d'événements du Core (`GET /api/stations/<id>/events`, SSE) :
-   - `select` : bascule `ptzview` sur la caméra choisie dans la matrice
-     (`/select/N` de l'API locale de `ptzview`, sans relance) ;
+   - `select` : bascule la sortie concernée sur la caméra choisie dans la
+     matrice (`/select/N` pour la sortie 1, `/output/M/select/N` pour les
+     autres, sans relance) ; le nombre de sorties vient du Core (`outputs` de
+     la station, 4 au plus) ;
    - `config_changed` : récupère tout de suite la nouvelle configuration ;
    - `state` (à chaque connexion) : se remet à jour ;
    - coupure : reconnexion toutes les `events_retry_s` secondes ;
-5. garde aussi une copie de la dernière caméra choisie (`state/selection.json`) :
-   après un redémarrage, `ptzview` repart sur elle, même sans Core ;
+5. garde aussi une copie de la dernière caméra choisie pour chaque sortie
+   (`state/selection.json`) : après un redémarrage, chaque sortie repart sur
+   elle, même sans Core ;
 6. vérifie aussi la configuration toutes les `poll_interval_s` secondes, en
    secours du flux d'événements ;
 7. si le Core est injoignable, continue avec la dernière configuration et la
@@ -38,7 +41,11 @@ Chaque connexion SRT est signée avec l'identifiant du poste
 statistiques SRT lues dans MediaMTX au bon poste, même derrière un relais
 (ADR 0010). Désactivable avec `tag_srt_streamid = false`.
 
-Pas encore : tally/UMD, manette, pilotage PTZ, deuxième sortie HDMI.
+Sorties 2 et suivantes : réglages dans `[ptzview.output2]`… de `agent.toml`
+(mêmes clés que la sortie 1 : `connector`, `hdmi_mode`, `video_plane`) ; par
+défaut `connector = "auto"` (le prochain écran branché).
+
+Pas encore : tally/UMD, manette, pilotage PTZ.
 
 ## Changements de configuration sans coupure
 

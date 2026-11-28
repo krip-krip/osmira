@@ -5,8 +5,9 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
-# MAX_CAMS in player/src/ptzview.h.
+# MAX_CAMS and MAX_OUTPUTS in player/src/ptzview.h.
 MAX_SLOTS = 16
+MAX_OUTPUTS = 4
 
 
 @dataclass(frozen=True)
@@ -23,6 +24,9 @@ class PtzviewSettings:
     select_retry_s: float = 10.0
     # Extra keys copied as-is into the [general] section of ptzview.conf.
     general: dict[str, str] = field(default_factory=dict)
+    # Extra keys of outputs 2.. ([ptzview.output2]...), copied into [outputN].
+    # Output 1 is set by `general` (connector, hdmi_mode...).
+    outputs: dict[int, dict[str, str]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -64,6 +68,11 @@ def load_settings(path: Path) -> Settings:
         restart_delay_s=float(pv.get("restart_delay_s", 2.0)),
         select_retry_s=float(pv.get("select_retry_s", 10.0)),
         general={k: str(v) for k, v in pv.get("general", {}).items()},
+        outputs={
+            n: {k: str(v) for k, v in pv.get(f"output{n}", {}).items()}
+            for n in range(2, MAX_OUTPUTS + 1)
+            if f"output{n}" in pv
+        },
     )
     return Settings(
         core_url=data["core_url"].rstrip("/"),

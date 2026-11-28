@@ -46,3 +46,9 @@ umd_off_alpha = 0.30
 stats_interval_s = 10
 rt_priority = 0
 loglevel = "error"
+
+# Outputs 2.. (the number of outputs comes from the Core: station "outputs").
+# Same keys as output 1 above; default connector = "auto" (next connected screen).
+# [ptzview.output2]
+# connector = "HDMI-A-2"
+# hdmi_mode = "1920x1080@50"
