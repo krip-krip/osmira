@@ -1,6 +1,6 @@
 # 0001 — Moteur vidéo en C : FFmpeg `+rpt` + DRM/KMS direct
 
-- Statut : Accepté
+- Statut : Accepté (complété par l'ADR 0014 : modules, indépendance matérielle)
 - Date : 2026-11-26
 
 ## Contexte

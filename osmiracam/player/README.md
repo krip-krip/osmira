@@ -14,13 +14,18 @@ sudo apt install build-essential pkg-config \
 apt policy libavcodec-dev        # la version installée doit contenir "+rpt"
 ```
 
-Copie de l'archive depuis ton poste, puis compilation sur le Pi :
+Copie du code depuis ton poste (dossier `osmiracam/` du dépôt), puis compilation
+sur le Pi :
 
 ```
-scp ptzview.tar.gz alex@panelTest:~
-ssh alex@panelTest
-tar xzf ptzview.tar.gz && cd ptzview && make
+git archive HEAD osmiracam | ssh paneltest 'tar -x -C ~/osmira'
+ssh paneltest
+cd ~/osmira/osmiracam/player && make
 ```
+
+Compilation stricte (identique à la CI) :
+`CFLAGS="-O2 -g -Wall -Wextra -Werror" make`. Après un changement de
+`CFLAGS`, faire `make clean` d'abord.
 
 ## 2. Lancement (à la main, depuis SSH)
 
@@ -143,6 +148,33 @@ configuration (retour aux valeurs du fichier au prochain lancement).
 | `Cannot allocate memory` à la reconnexion | CMA saturée : baisser `extra_hw_frames` à 0 ou 1 |
 | `connexion : Input/output error` | MediaMTX injoignable ou chemin `camN` pas prêt |
 | `plus de données (timeout)` | flux coupé plus de `stall_timeout_ms` |
+
+## 7. Organisation du code (`src/`)
+
+Un module par sujet (ADR 0014). `ptzview.h` décrit l'état partagé (`g` :
+configuration, caméras, verrou `g.lock`) et les fonctions appelées d'un module
+à l'autre ; ce qui n'est utilisé que dans un fichier y reste `static`.
+
+| Fichier | Rôle |
+|---|---|
+| `main.c` | démarrage, ligne de stats périodique, arrêt |
+| `util.c` | horloge, journal, priorité temps réel, tampon de texte, chaînes JSON |
+| `sysinfo.c` | chiffres du matériel (RAM, CMA, température) : seul endroit propre à la machine |
+| `config.c` | valeurs par défaut, lecture de `ptzview.conf` |
+| `srt_hooks.c` | contournements libsrt (ADR 0012) et stats SRT côté réception (ADR 0013) |
+| `input.c` | un thread par entrée : réception SRT, décodage matériel, dernière image |
+| `kms.h`, `kms.c` | sortie DRM/KMS : connecteur, mode, plans, framebuffers |
+| `osd.h`, `osd.c` | calques cairo : bordure tally, UMD, NO SIGNAL |
+| `display.c` | thread d'affichage : montre la caméra choisie, mesure la bascule |
+| `http.c` | API HTTP locale (`/status`, `/select`, `/tally`, `/label`, `/input`) |
+
+Où intervenir :
+- **nouvelle route HTTP** : `http_cb()` dans `http.c` ;
+- **nouveau champ de `/status`** : `status_json()` dans `http.c` ;
+- **nouveau réglage `ptzview.conf`** : `struct config` (`ptzview.h`),
+  `config_defaults()` et `set_general()` (`config.c`) ;
+- **nouveau calque** : `struct osd_state` (`osd.h`), `osd_differs()` et
+  `osd_render()` (`osd.c`), état rempli dans `display_thread()`.
 
 ## Points connus
 
