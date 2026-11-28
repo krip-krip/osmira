@@ -22,8 +22,14 @@ hwaccel_device =
 # Images supplementaires par decodeur (memoire CMA : ~3 Mo chacune)
 extra_hw_frames = 2
 
-# Sortie HDMI. drm_device = auto ou /dev/dri/card0
+# Sorties video (1 a 4). La sortie 1 se regle ici (connector, hdmi_mode,
+# video_plane, start_camera), les suivantes dans [output2], [output3]...
+# Une sortie sans ecran est signalee et garde sa camera choisie.
+outputs = 1
+
+# Sortie HDMI 1. drm_device = auto ou /dev/dri/card0
 drm_device = auto
+# Nom (HDMI-A-1, HDMI-A-2...) ou auto (premier ecran branche non pris)
 connector = HDMI-A-1
 # WxH@Hz, numero de mode, ou auto. 50 Hz conseille en 25p comme en 50p.
 hdmi_mode = 1920x1080@50
@@ -44,6 +50,13 @@ stats_interval_s = 10
 rt_priority = 0
 # Journal FFmpeg : quiet, error, warning, info, verbose
 loglevel = error
+
+# Sortie 2, utilisee si outputs >= 2 (memes cles que la sortie 1).
+[output2]
+connector = auto
+hdmi_mode = 1920x1080@50
+video_plane = auto
+start_camera = 2
 
 # Une section par entree (cam1 a camN, N = cameras).
 # Les URL sont sans latency= (elle vient de srt_latency_ms ci-dessus).

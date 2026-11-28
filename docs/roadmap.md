@@ -51,7 +51,10 @@ affichée depuis le Core. Pas de pilotage PTZ à cette étape.
   désactivées ; l'agent ne touche que les entrées modifiées.
 - [x] `ptzview` découpé en modules, indépendant du matériel (ADR 0014).
 - [x] `ptzview` : nombre de caméras configurable (`cameras`, `slots` de l'agent).
-- [ ] `ptzview` : deuxième sortie HDMI, plus de 4 flux (selon le matériel).
+- [x] `ptzview` : plusieurs sorties vidéo (`outputs`, `/output/M/select/N`),
+  essayé avec un seul écran.
+- [ ] Agent : une caméra par sortie (sélections du Core pour chaque sortie).
+- [ ] Essai à deux écrans (deux sorties HDMI du Pi 4).
 - [ ] Tally/UMD par SSE.
 
 ## Étape 4 — Pilotage PTZ (plus tard ; prévu dans le modèle)

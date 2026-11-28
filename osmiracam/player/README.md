@@ -67,7 +67,8 @@ GET ou POST, au choix. Chaque commande renvoie l'état complet en JSON.
 P=http://panelTest:8080           # ou l'adresse IP / NetBird du Pi
 
 curl $P/status                    # état (ajouter | jq pour lire)
-curl $P/select/2                  # afficher la caméra 2
+curl $P/select/2                  # afficher la caméra 2 (sortie 1)
+curl $P/output/2/select/3         # afficher la caméra 3 sur la sortie 2
 curl $P/tally/2/pgm               # tally caméra 2 : off | pvw | pgm
 curl $P/tally/1/pvw
 curl --data 'PLATEAU LARGE' $P/label/2              # texte de la caméra 2
@@ -92,6 +93,11 @@ Une entrée sans URL (`url =` vide dans la configuration) est désactivée :
 waiting / disabled), `signal`, `fps`, `mbps`, `connects` (nombre de connexions réussies),
 `decode_errors`, `last_error` ; plus `last_switch_ms` et un bloc `system`
 (RAM, swap, CMA libre, température).
+
+`outputs` décrit chaque sortie vidéo : `output`, `connected` (écran trouvé au
+démarrage), `screen` (`"HDMI-A-1 1920x1080@50"`, `null` sans écran), `active`
+(entrée affichée), `last_switch_ms`. Les champs `active`, `output` et
+`last_switch_ms` de la racine concernent la sortie 1.
 
 Chaque caméra a aussi un bloc `srt` : les statistiques SRT vues par le Pi
 (récepteur), lues dans libsrt (ADR 0013), ou `null` si l'entrée n'est pas
@@ -136,6 +142,13 @@ configuration (retour aux valeurs du fichier au prochain lancement).
   entrée. Seules ces entrées sont reçues et décodées ; la limite réelle dépend du
   matériel (CMA, décodeur : 4 flux 1080p50 sur Pi 4). `/status` donne ce nombre
   dans `inputs`, et les routes refusent un numéro hors de 1…`cameras`.
+- `outputs` : nombre de sorties vidéo, de 1 à 4 (défaut 1). La sortie 1 se règle
+  dans `[general]` (`connector`, `hdmi_mode`, `video_plane`, `start_camera`), les
+  autres dans `[output2]`… avec les mêmes clés. `connector = auto` prend le premier
+  écran branché qui n'est pas déjà pris (les noms explicites passent d'abord). Une
+  sortie sans écran au démarrage est signalée (« sortie 2 : pas d'écran ») et garde
+  sa caméra choisie ; ptzview ne s'arrête que si aucune sortie n'a d'écran. Un écran
+  branché ensuite n'est vu qu'au redémarrage de ptzview.
 - `srt_latency_ms` : latence par défaut des entrées (`latency_ms` dans `[camN]` la remplace), en **millisecondes** (converti pour FFmpeg, qui attend des µs).
   Ne pas mettre `latency=` dans les URL. Côté MediaMTX : `srtMinLatency: 20ms`.
 - `hdmi_mode` : `1920x1080@50`, un numéro de mode, ou `auto`. 50 Hz conseillé
@@ -168,9 +181,9 @@ configuration, caméras, verrou `g.lock`) et les fonctions appelées d'un module
 | `config.c` | valeurs par défaut, lecture de `ptzview.conf` |
 | `srt_hooks.c` | contournements libsrt (ADR 0012) et stats SRT côté réception (ADR 0013) |
 | `input.c` | un thread par entrée : réception SRT, décodage matériel, dernière image |
-| `kms.h`, `kms.c` | sortie DRM/KMS : connecteur, mode, plans, framebuffers |
+| `kms.h`, `kms.c` | sorties DRM/KMS : connecteurs, modes, plans (un plan = une sortie), framebuffers |
 | `osd.h`, `osd.c` | calques cairo : bordure tally, UMD, NO SIGNAL |
-| `display.c` | thread d'affichage : montre la caméra choisie, mesure la bascule |
+| `display.c` | un thread d'affichage par sortie : montre sa caméra, mesure la bascule |
 | `http.c` | API HTTP locale (`/status`, `/select`, `/tally`, `/label`, `/input`) |
 
 Où intervenir :

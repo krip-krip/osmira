@@ -43,7 +43,8 @@
 - API HTTP locale : `/status`, `/select/N`, `/tally/N/off|pvw|pgm`, `/label/N`,
   `/input/N` (nouvelle URL d'une entrée à chaud ; vide = désactivée).
 - Nombre d'entrées réglable (`cameras`, 1 à 16, 4 par défaut ; `slots` de l'agent).
-- Évolution prévue : plusieurs sorties HDMI.
+- Plusieurs sorties vidéo (`outputs`, 1 à 4) : un thread d'affichage par écran,
+  chaque sortie montre sa caméra (`/output/M/select/N`).
 
 ### agent OsmiraCam (Python)
 - **Connecteur Core** : récupère la configuration complète (versionnée), l'enregistre
