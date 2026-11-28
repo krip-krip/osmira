@@ -182,7 +182,10 @@ curl -N localhost:8000/api/stations/panelTest/events
     "shown_camera": "cam2",
     "cameras": [{"camera_id": "cam1", "state": "streaming", "fps": 49.9, "mbps": 16.2,
                  "width": 1920, "height": 1080, "connects": 1, "decode_errors": 0,
-                 "last_error": ""}]
+                 "last_error": "",
+                 "srt": {"rtt_ms": 4.8, "recv_mbps": 12.2, "bandwidth_mbps": 600.0,
+                         "latency_ms": 20, "buffer_ms": 1, "packets": 69041,
+                         "lost": 5218, "retrans": 5972, "dropped": 173, "belated": 1495}}]
   },
   "hardware": {"model": "Raspberry Pi 4 Model B Rev 1.5", "arch": "aarch64", "ram_mb": 905,
                "os": "Debian GNU/Linux 13 (trixie)", "kernel": "6.12…", "python": "3.13.5"},
@@ -191,6 +194,11 @@ curl -N localhost:8000/api/stations/panelTest/events
 }
 ```
 
+- `srt` : statistiques SRT vues par le poste (récepteur, ADR 0013), lues
+  dans `ptzview`. Compteurs cumulés depuis la connexion (une reconnexion fait
+  changer `connects`) ; `dropped` = paquets jamais arrivés à temps (image
+  abîmée). `null` ou absent si l'entrée n'est pas connectée ou si le lecteur
+  est ancien.
 - `GET /api/stations/{id}/status` → `online` (dernier état reçu il y a moins de
   `OSMIRACORE_ONLINE_TIMEOUT_S`, 15 s par défaut), `last_seen` (UTC),
   `seconds_since`, `config_up_to_date` (la version appliquée par le poste
@@ -257,12 +265,16 @@ curl -N localhost:8000/api/stations/panelTest/events
   `connections`, `packets`, `packets_lost`, `packets_retrans`,
   `packets_dropped`, `loss_percent`, `rtt_avg_ms`, `rtt_max_ms`, `mbps_avg` ;
   poste (`null` côté caméra → serveur) : `fps_avg`, `fps_min`, `no_picture_s`
-  (temps sans image), `decode_errors`, `reconnects`. Les connexions
-  successives et redémarrages du lecteur sont additionnés.
+  (temps sans image), `decode_errors`, `reconnects` ; SRT vu par le poste
+  (`null` s'il ne le remonte pas) : `station_packets`, `station_lost`,
+  `station_retrans`, `station_dropped`, `station_loss_percent`,
+  `station_rtt_avg_ms`, `station_latency_ms` (dernière latence négociée). Les
+  connexions successives et redémarrages du lecteur sont additionnés.
 - `GET /api/links/series?id=<id>&since=&until=&points=600` : courbes d'une
   liaison par tranches de temps (`t`, `rtt_ms`, `mbps`, `loss_percent`,
-  `retrans_per_s`, `dropped`, `fps`, `station_mbps`, `decode_errors` ; `null` =
-  pas de donnée).
+  `retrans_per_s`, `dropped`, `fps`, `station_mbps`, `decode_errors`,
+  `station_rtt_ms`, `station_loss_percent`, `station_retrans_per_s`,
+  `station_dropped` ; `null` = pas de donnée).
 
 ## Prévu (incréments suivants, à préciser le moment venu)
 

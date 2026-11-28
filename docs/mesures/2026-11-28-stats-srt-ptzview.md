@@ -51,3 +51,20 @@ RTT 4,8–5,2 ms, 12,2 Mb/s reçus par entrée, ~69 000 paquets par entrée.
 
 Conclusion provisoire : avant de choisir la latence, trouver l'origine des
 pertes sur le chemin `.252` (la question ouverte « pertes toutes les 12 s »).
+
+## Les deux vues dans le Core (même jour, 12:50 UTC)
+
+Caméras `test1`–`test4` déclarées dans le Core, latence 20 ms, 2 minutes,
+résumé de la page Links (liaison MediaMTX → panelTest) :
+
+| Chemin | Pertes MediaMTX | Jetés MediaMTX | Pertes Pi | **Jetés Pi** |
+|---|---|---|---|---|
+| test1 | 1,19 % | 0 | 0,73 % | **34** |
+| test2 | 2,30 % | 0 | 1,79 % | **43** |
+| test3 | 1,26 % | 0 | 0,88 % | **20** |
+| test4 | 1,39 % | 0 | 1,36 % | **36** |
+
+- Le « dropped » de MediaMTX (émetteur) reste à 0 alors que le Pi jette des
+  paquets : seule la vue du récepteur montre l'image abîmée.
+- Pertes plus faibles qu'à 12:30 (7–8 %) : elles varient fortement dans le
+  temps, à suivre sur les courbes.

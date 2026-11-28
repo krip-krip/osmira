@@ -46,13 +46,41 @@ def _ends(lid: str) -> dict[str, str | None]:
     return {"kind": kind, "camera_id": parts[0], "station_id": parts[1]}
 
 
-def _delta(new: int | None, old: int | None) -> int:
+def counter_delta(new: int | None, old: int | None) -> int:
     """Increase of a cumulative counter; after a reset, the new value."""
     if new is None:
         return 0
     if old is None or new < old:
         return new if old is not None else 0
     return new - old
+
+
+@dataclass
+class StationSrtDelta:
+    """Increase of the station's SRT counters between two station samples."""
+
+    packets: int = 0
+    lost: int = 0
+    retrans: int = 0
+    dropped: int = 0
+
+
+def station_srt_delta(row: StationSample, prev: StationSample) -> StationSrtDelta | None:
+    """None when the station reported no SRT figures. The counters start
+    again with each connection: after a reconnection (connects changed), the
+    whole new value counts."""
+    if row.srt_packets is None:
+        return None
+    if row.connects != prev.connects or prev.srt_packets is None:
+        return StationSrtDelta(
+            row.srt_packets, row.srt_lost or 0, row.srt_retrans or 0, row.srt_dropped or 0
+        )
+    return StationSrtDelta(
+        counter_delta(row.srt_packets, prev.srt_packets),
+        counter_delta(row.srt_lost, prev.srt_lost),
+        counter_delta(row.srt_retrans, prev.srt_retrans),
+        counter_delta(row.srt_dropped, prev.srt_dropped),
+    )
 
 
 @dataclass
@@ -77,6 +105,10 @@ class _Acc:
     no_picture_s: float = 0.0
     decode_errors: int = 0
     reconnects: int = 0
+    # SRT seen by the station
+    st_srt: StationSrtDelta | None = None
+    st_rtt: list[float] = field(default_factory=list)
+    st_latency: int | None = None
 
     def seen(self, ts: float, camera_id: str | None) -> None:
         self.first = min(self.first, ts)
@@ -90,10 +122,10 @@ class _Acc:
         self.connections.add(conn)
         prev = self.srt_prev.get(conn)
         if prev is not None:
-            self.packets += _delta(row.packets, prev.packets)
-            self.lost += _delta(row.packets_lost, prev.packets_lost)
-            self.retrans += _delta(row.packets_retrans, prev.packets_retrans)
-            self.dropped += _delta(row.packets_dropped, prev.packets_dropped)
+            self.packets += counter_delta(row.packets, prev.packets)
+            self.lost += counter_delta(row.packets_lost, prev.packets_lost)
+            self.retrans += counter_delta(row.packets_retrans, prev.packets_retrans)
+            self.dropped += counter_delta(row.packets_dropped, prev.packets_dropped)
         self.srt_prev[conn] = row
         if row.rtt_ms is not None:
             self.rtt.append(row.rtt_ms)
@@ -106,12 +138,23 @@ class _Acc:
         prev = self.st_prev
         fps = row.fps or 0.0
         self.fps.append(fps)
+        if row.srt_rtt_ms is not None:
+            self.st_rtt.append(row.srt_rtt_ms)
+        if row.srt_latency_ms is not None:
+            self.st_latency = row.srt_latency_ms
         if prev is not None:
             gap = row.ts - prev.ts
             if fps < 1 and gap <= MAX_GAP_S:
                 self.no_picture_s += gap
-            self.decode_errors += _delta(row.decode_errors, prev.decode_errors)
-            self.reconnects += _delta(row.connects, prev.connects)
+            self.decode_errors += counter_delta(row.decode_errors, prev.decode_errors)
+            self.reconnects += counter_delta(row.connects, prev.connects)
+            d = station_srt_delta(row, prev)
+            if d is not None:
+                t = self.st_srt = self.st_srt or StationSrtDelta()
+                t.packets += d.packets
+                t.lost += d.lost
+                t.retrans += d.retrans
+                t.dropped += d.dropped
         self.st_prev = row
 
 
@@ -162,6 +205,7 @@ def _summary(lid: str, acc: _Acc, now: float, active_s: float) -> LinkSummary:
     ends = _ends(lid)
     has_srt = acc.srt_samples > 0
     has_station = acc.st_samples > 0
+    st = acc.st_srt
     return LinkSummary(
         id=lid,
         kind=ends["kind"],  # checked by the schema
@@ -182,6 +226,13 @@ def _summary(lid: str, acc: _Acc, now: float, active_s: float) -> LinkSummary:
         rtt_avg_ms=_avg(acc.rtt),
         rtt_max_ms=round(max(acc.rtt), 2) if acc.rtt else None,
         mbps_avg=_avg(acc.mbps),
+        station_packets=st.packets if st else None,
+        station_lost=st.lost if st else None,
+        station_retrans=st.retrans if st else None,
+        station_dropped=st.dropped if st else None,
+        station_loss_percent=round(100 * st.lost / st.packets, 3) if st and st.packets else None,
+        station_rtt_avg_ms=_avg(acc.st_rtt),
+        station_latency_ms=acc.st_latency,
         fps_avg=_avg(acc.fps) if has_station else None,
         fps_min=round(min(acc.fps), 1) if has_station else None,
         no_picture_s=round(acc.no_picture_s, 1) if has_station else None,
@@ -217,10 +268,10 @@ def series(
         if row.mbps is not None:
             b.mbps[i].append(row.mbps)
         if prev is not None:
-            b.packets[i] += _delta(row.packets, prev.packets)
-            b.lost[i] += _delta(row.packets_lost, prev.packets_lost)
-            b.retrans[i] += _delta(row.packets_retrans, prev.packets_retrans)
-            b.dropped[i] += _delta(row.packets_dropped, prev.packets_dropped)
+            b.packets[i] += counter_delta(row.packets, prev.packets)
+            b.lost[i] += counter_delta(row.packets_lost, prev.packets_lost)
+            b.retrans[i] += counter_delta(row.packets_retrans, prev.packets_retrans)
+            b.dropped[i] += counter_delta(row.packets_dropped, prev.packets_dropped)
             b.srt_seconds[i] += row.ts - prev.ts
             b.has_srt[i] = True
         prev_srt[conn] = row
@@ -232,9 +283,19 @@ def series(
         b.fps[i].append(row.fps or 0.0)
         if row.mbps is not None:
             b.st_mbps[i].append(row.mbps)
+        if row.srt_rtt_ms is not None:
+            b.st_rtt[i].append(row.srt_rtt_ms)
         if prev_st is not None:
-            b.decode[i] += _delta(row.decode_errors, prev_st.decode_errors)
+            b.decode[i] += counter_delta(row.decode_errors, prev_st.decode_errors)
             b.has_st[i] = True  # a count needs two samples, like the SRT losses
+            d = station_srt_delta(row, prev_st)
+            if d is not None:
+                b.st_packets[i] += d.packets
+                b.st_lost[i] += d.lost
+                b.st_retrans[i] += d.retrans
+                b.st_dropped[i] += d.dropped
+                b.st_srt_seconds[i] += row.ts - prev_st.ts
+                b.has_st_srt[i] = True
         prev_st = row
     return LinkSeries(
         id=lid,
@@ -242,19 +303,33 @@ def series(
         t=[round(since + i * bucket, 1) for i in range(count)],
         rtt_ms=[_avg(x) for x in b.rtt],
         mbps=[_avg(x) for x in b.mbps],
-        loss_percent=[
-            round(100 * lost / pk, 3) if ok and pk else (0.0 if ok else None)
-            for lost, pk, ok in zip(b.lost, b.packets, b.has_srt, strict=True)
-        ],
-        retrans_per_s=[
-            round(r / sec, 2) if ok and sec else None
-            for r, sec, ok in zip(b.retrans, b.srt_seconds, b.has_srt, strict=True)
-        ],
+        loss_percent=_loss(b.lost, b.packets, b.has_srt),
+        retrans_per_s=_per_s(b.retrans, b.srt_seconds, b.has_srt),
         dropped=[d if ok else None for d, ok in zip(b.dropped, b.has_srt, strict=True)],
         fps=[_avg(x) for x in b.fps],
         station_mbps=[_avg(x) for x in b.st_mbps],
         decode_errors=[d if ok else None for d, ok in zip(b.decode, b.has_st, strict=True)],
+        station_rtt_ms=[_avg(x) for x in b.st_rtt],
+        station_loss_percent=_loss(b.st_lost, b.st_packets, b.has_st_srt),
+        station_retrans_per_s=_per_s(b.st_retrans, b.st_srt_seconds, b.has_st_srt),
+        station_dropped=[
+            d if ok else None for d, ok in zip(b.st_dropped, b.has_st_srt, strict=True)
+        ],
     )
+
+
+def _loss(lost: list[int], packets: list[int], ok: list[bool]) -> list[float | None]:
+    return [
+        round(100 * x / pk, 3) if has and pk else (0.0 if has else None)
+        for x, pk, has in zip(lost, packets, ok, strict=True)
+    ]
+
+
+def _per_s(counts: list[int], seconds: list[float], ok: list[bool]) -> list[float | None]:
+    return [
+        round(c / sec, 2) if has and sec else None
+        for c, sec, has in zip(counts, seconds, ok, strict=True)
+    ]
 
 
 class _Buckets:
@@ -271,6 +346,14 @@ class _Buckets:
         self.srt_seconds = [0.0] * n
         self.has_srt = [False] * n
         self.has_st = [False] * n
+        # SRT seen by the station
+        self.st_rtt: list[list[float]] = [[] for _ in range(n)]
+        self.st_packets = [0] * n
+        self.st_lost = [0] * n
+        self.st_retrans = [0] * n
+        self.st_dropped = [0] * n
+        self.st_srt_seconds = [0.0] * n
+        self.has_st_srt = [False] * n
 
 
 def _avg(values: Iterable[float]) -> float | None:

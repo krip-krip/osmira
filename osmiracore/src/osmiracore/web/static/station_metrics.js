@@ -63,6 +63,21 @@
         data: [...names.map((n) => d.cameras[n].fps), errors],
       };
     },
+    // Receiver-side SRT (ADR 0013): loss on the left, dropped packets (dashed) on the right.
+    srt: (d) => {
+      const names = Object.keys(d.cameras);
+      return {
+        series: [
+          ...names.map((n, i) => line(`${n} loss %`, i)),
+          ...names.map((n, i) => line(`${n} dropped`, i, "p", { dash: [5, 4] })),
+        ],
+        axes: [axis("loss %"), axis("dropped", "p", 1)],
+        data: [
+          ...names.map((n) => d.cameras[n].srt_loss_percent),
+          ...names.map((n) => d.cameras[n].srt_dropped),
+        ],
+      };
+    },
   };
 
   const plots = {};
