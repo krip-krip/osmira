@@ -32,6 +32,7 @@ Règles :
 | [0010](0010-stats-srt-depuis-mediamtx.md) | Statistiques SRT lues par le Core dans l'API MediaMTX | Accepté |
 | [0011](0011-source-des-cameras.md) | Source d'une caméra : serveur média ou direct, URL calculée ou imposée | Accepté |
 | [0012](0012-contournement-libsrt-cleanup.md) | Contournement du décompte srt_startup/srt_cleanup de libsrt 1.5.4 | Accepté |
+| [0013](0013-stats-srt-lues-dans-ptzview.md) | Statistiques SRT côté réception lues dans ptzview | Accepté |
 
 ## Modèle
 
