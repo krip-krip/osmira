@@ -1,7 +1,8 @@
 /*
- * ptzview — lecteur 4 x SRT/HEVC pour Raspberry Pi 4 (maquette)
+ * ptzview — lecteur N x SRT/HEVC (Raspberry Pi 4 et autres)
  *
- *  - 4 entrées SRT (MPEG-TS/HEVC) reçues et décodées en permanence
+ *  - N entrées SRT (MPEG-TS/HEVC, réglage cameras, 4 par défaut) reçues et
+ *    décodées en permanence
  *    (FFmpeg "+rpt", hwaccel drm -> images DRM PRIME, zéro copie)
  *  - affichage DRM/KMS atomique : la caméra choisie sur un plan vidéo,
  *    tally + UMD + NO SIGNAL sur un plan ARGB au-dessus (redessiné
@@ -12,6 +13,7 @@
  *   -n : pas d'affichage (décodage + API seulement, pour diagnostic)
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
@@ -102,35 +104,35 @@ int main(int argc, char **argv)
     pthread_t disp;
     if (!g.no_display)
         pthread_create(&disp, NULL, display_thread, NULL);
-    for (int i = 0; i < NCAM; i++)
+    for (int i = 0; i < g.cfg.cameras; i++)
         pthread_create(&g.cam[i].th, NULL, cam_thread, &g.cam[i]);
 
-    logm("prêt : cam%d à l'écran, latence SRT %d ms. Ctrl+C pour quitter.", g.selected + 1,
-         g.cfg.srt_latency_ms);
+    logm("prêt : %d entrées, cam%d à l'écran, latence SRT %d ms. Ctrl+C pour quitter.",
+         g.cfg.cameras, g.selected + 1, g.cfg.srt_latency_ms);
 
     int64_t next_stats = now_us() + (int64_t)g.cfg.stats_interval_s * 1000000;
     while (!g.quit) {
         usleep(100000);
         if (g.cfg.stats_interval_s > 0 && now_us() >= next_stats) {
             next_stats += (int64_t)g.cfg.stats_interval_s * 1000000;
-            char line[512];
-            int n = 0;
+            struct sbuf line = { 0 };
             int64_t t = now_us();
             pthread_mutex_lock(&g.lock);
-            for (int i = 0; i < NCAM; i++) {
+            for (int i = 0; i < g.cfg.cameras; i++) {
                 struct cam *c = &g.cam[i];
                 bool sig = c->state == ST_STREAMING &&
                            t - c->last_frame_us < (int64_t)g.cfg.stall_timeout_ms * 1000;
-                n += snprintf(line + n, sizeof line - n, "%scam%d%s %s ", i ? "| " : "", i + 1,
-                              i == g.selected ? "*" : "", tally_name[c->tally]);
+                sb_printf(&line, "%scam%d%s %s ", i ? "| " : "", i + 1,
+                          i == g.selected ? "*" : "", tally_name[c->tally]);
                 if (sig)
-                    n += snprintf(line + n, sizeof line - n, "%.1f i/s %.1f Mb/s ", c->fps, c->mbps);
+                    sb_printf(&line, "%.1f i/s %.1f Mb/s ", c->fps, c->mbps);
                 else
-                    n += snprintf(line + n, sizeof line - n, "%s ", state_name[c->state]);
+                    sb_printf(&line, "%s ", state_name[c->state]);
             }
             pthread_mutex_unlock(&g.lock);
-            logm("%s| CMA libre %ld Mo | RAM dispo %ld Mo | %.1f °C", line,
+            logm("%s| CMA libre %ld Mo | RAM dispo %ld Mo | %.1f °C", line.b ? line.b : "",
                  meminfo_kb("CmaFree") / 1024, meminfo_kb("MemAvailable") / 1024, soc_temp());
+            free(line.b);
         }
     }
 
@@ -140,10 +142,10 @@ int main(int argc, char **argv)
     pthread_mutex_unlock(&g.lock);
     if (!g.no_display)
         pthread_join(disp, NULL);
-    for (int i = 0; i < NCAM; i++)
+    for (int i = 0; i < g.cfg.cameras; i++)
         pthread_join(g.cam[i].th, NULL);
     http_stop();
-    for (int i = 0; i < NCAM; i++)
+    for (int i = 0; i < MAX_CAMS; i++)
         av_frame_free(&g.cam[i].latest);
     av_buffer_unref(&g.hwdev);
     kms_close();

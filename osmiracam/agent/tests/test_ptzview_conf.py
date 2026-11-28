@@ -1,3 +1,5 @@
+import dataclasses
+
 import pytest
 from conftest import core_config
 
@@ -48,11 +50,25 @@ def test_general_section(settings):
 
     general = parse(render(config, settings.ptzview))["general"]
 
+    assert general["cameras"] == "4"
     assert general["srt_latency_ms"] == "20"  # fixed default: latency is per input
     conf = parse(render(config, settings.ptzview))
     assert (conf["cam1"]["latency_ms"], conf["cam2"]["latency_ms"]) == ("20", "40")
     assert general["http_port"] == "8081"
     assert general["hdmi_mode"] == "1920x1080@50"
+
+
+def test_number_of_inputs_follows_slots(settings):
+    ptz = dataclasses.replace(settings.ptzview, slots=6)
+    names = [f"cam{n}" for n in range(1, 6)]
+    config = StationConfig.from_json(core_config([(c, i, True) for i, c in enumerate(names, 1)]))
+
+    conf = parse(render(config, ptz))
+
+    assert conf["general"]["cameras"] == "6"
+    assert [s for s in conf if s.startswith("cam")] == [f"cam{n}" for n in range(1, 7)]
+    assert conf["cam5"]["url"].endswith("read:cam5:::station=panelTest")
+    assert conf["cam6"]["url"] == UNUSED_SLOT_URL
 
 
 def test_start_on_first_viewable_camera(settings):

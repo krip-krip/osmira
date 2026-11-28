@@ -30,13 +30,14 @@ void config_defaults(void)
     strcpy(c->hdmi_mode, "1920x1080@50");
     strcpy(c->video_plane, "auto");
     c->http_port = 8080;
+    c->cameras = 4;
     c->start_camera = 1;
     strcpy(c->font, "DejaVu Sans");
     c->umd_off_alpha = 0.30;
     c->stats_interval_s = 10;
     c->rt_priority = 0;
     strcpy(c->loglevel, "error");
-    for (int i = 0; i < NCAM; i++) {
+    for (int i = 0; i < MAX_CAMS; i++) {
         struct cam *cm = &g.cam[i];
         cm->idx = i;
         snprintf(cm->url, sizeof cm->url,
@@ -85,16 +86,26 @@ static int set_general(const char *k, const char *v)
     CFG_INT(srt_latency_ms) CFG_INT(connect_timeout_ms) CFG_INT(stall_timeout_ms)
     CFG_INT(reconnect_ms) CFG_STR(hwaccel) CFG_STR(hwaccel_device) CFG_INT(extra_hw_frames)
     CFG_STR(drm_device) CFG_STR(connector) CFG_STR(hdmi_mode) CFG_STR(video_plane)
-    CFG_INT(http_port) CFG_INT(start_camera) CFG_STR(font) CFG_DBL(umd_off_alpha)
-    CFG_INT(stats_interval_s) CFG_INT(rt_priority) CFG_STR(loglevel)
+    CFG_INT(cameras) CFG_INT(http_port) CFG_INT(start_camera) CFG_STR(font)
+    CFG_DBL(umd_off_alpha) CFG_INT(stats_interval_s) CFG_INT(rt_priority) CFG_STR(loglevel)
     return -1;
+}
+
+/* N of a [camN] section (1..MAX_CAMS), 0 if the section is not one. */
+static int cam_section(const char *sect)
+{
+    char *end;
+    if (strncmp(sect, "cam", 3) || !isdigit((unsigned char)sect[3]))
+        return 0;
+    long n = strtol(sect + 3, &end, 10);
+    return !*end && n >= 1 && n <= MAX_CAMS ? (int)n : 0;
 }
 
 int load_config(const char *path)
 {
     FILE *f = fopen(path, "r");
     char line[1024], sect[32] = "";
-    int ln = 0;
+    int ln = 0, last_cam = 0;
     if (!f) {
         logm("config : impossible d'ouvrir %s : %s", path, strerror(errno));
         return -1;
@@ -122,8 +133,11 @@ int load_config(const char *path)
         if (!strcmp(sect, "general")) {
             if (set_general(k, v) < 0)
                 logm("config:%d : clé inconnue « %s »", ln, k);
-        } else if (!strncmp(sect, "cam", 3) && sect[3] >= '1' && sect[3] <= '4' && !sect[4]) {
-            struct cam *c = &g.cam[sect[3] - '1'];
+        } else if (cam_section(sect)) {
+            int n = cam_section(sect);
+            struct cam *c = &g.cam[n - 1];
+            if (n > last_cam)
+                last_cam = n;
             if (!strcmp(k, "url"))
                 snprintf(c->url, sizeof c->url, "%s", v);
             else if (!strcmp(k, "latency_ms"))
@@ -142,7 +156,16 @@ int load_config(const char *path)
             logm("config:%d : section inconnue [%s]", ln, sect);
     }
     fclose(f);
-    if (g.cfg.start_camera < 1 || g.cfg.start_camera > NCAM)
+    if (g.cfg.cameras < 1 || g.cfg.cameras > MAX_CAMS) {
+        int n = g.cfg.cameras < 1 ? 1 : MAX_CAMS;
+        logm("config : cameras = %d hors limites (1 à %d) : %d entrées", g.cfg.cameras, MAX_CAMS,
+             n);
+        g.cfg.cameras = n;
+    }
+    if (last_cam > g.cfg.cameras)
+        logm("config : sections [cam%d] à [cam%d] ignorées (cameras = %d)", g.cfg.cameras + 1,
+             last_cam, g.cfg.cameras);
+    if (g.cfg.start_camera < 1 || g.cfg.start_camera > g.cfg.cameras)
         g.cfg.start_camera = 1;
     return 0;
 }

@@ -5,13 +5,17 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+# MAX_CAMS in player/src/ptzview.h.
+MAX_SLOTS = 16
+
 
 @dataclass(frozen=True)
 class PtzviewSettings:
     binary: Path
     conf_path: Path
     http_port: int = 8081
-    # Inputs of ptzview: fixed at 4 for now (NCAM in player/src/ptzview.h).
+    # Inputs of ptzview ("cameras" in ptzview.conf), 1 to MAX_SLOTS. The real
+    # limit is the hardware (4 HEVC 1080p50 streams on a Pi 4).
     slots: int = 4
     stop_timeout_s: float = 5.0
     restart_delay_s: float = 2.0
@@ -48,11 +52,14 @@ def load_settings(path: Path) -> Settings:
         return p if p.is_absolute() else (base / p).resolve()
 
     pv = data.get("ptzview", {})
+    slots = int(pv.get("slots", 4))
+    if not 1 <= slots <= MAX_SLOTS:
+        raise ValueError(f"{path}: [ptzview] slots = {slots}, expected 1 to {MAX_SLOTS}")
     ptzview = PtzviewSettings(
         binary=resolve(pv.get("binary", "../player/ptzview")),
         conf_path=resolve(pv.get("conf_path", "state/ptzview.conf")),
         http_port=int(pv.get("http_port", 8081)),
-        slots=int(pv.get("slots", 4)),
+        slots=slots,
         stop_timeout_s=float(pv.get("stop_timeout_s", 5.0)),
         restart_delay_s=float(pv.get("restart_delay_s", 2.0)),
         select_retry_s=float(pv.get("select_retry_s", 10.0)),
