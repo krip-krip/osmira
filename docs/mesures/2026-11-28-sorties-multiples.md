@@ -18,3 +18,13 @@ HEVC 1080p ~43 i/s via MediaMTX. ptzview lancé à la main, agent arrêté.
 
 Reste à faire avec un 2e écran : deux sorties allumées en même temps, même
 caméra sur les deux, coût en CMA de la 2e sortie, bascules simultanées.
+
+## Agent : une caméra par sortie (de bout en bout, un seul écran)
+- Ancien fichier `state/selection.json` (`{"camera_id": "test4"}`) relu : la
+  sortie 1 repart sur `test4`.
+- Station passée à 2 sorties dans le Core : l'agent écrit `outputs = 2` et
+  `[output2]` dans ptzview.conf et relance ptzview (« sortie 2 : pas d'écran »).
+- Matrice, sortie 2 → `test2` : `output 2: showing input 2`, gardé par ptzview
+  (`outputs[1].active = 2`) ; sélection enregistrée `{"1": "test4", "2": "test2"}`.
+- Matrice, sortie 1 → `test1` : bascule à l'écran en 36,2 ms.
+- Station remise à 1 sortie : ptzview relancé avec `outputs = 1`, sortie 1 inchangée.
