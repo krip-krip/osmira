@@ -13,6 +13,7 @@
  */
 #define _GNU_SOURCE
 #include <ctype.h>
+#include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <math.h>
@@ -42,6 +43,7 @@
 
 #include <cairo.h>
 #include <microhttpd.h>
+#include <srt/srt.h>
 
 /*
  * Workaround for libsrt 1.5.4 (Debian trixie): srt_startup() only counts its
@@ -77,6 +79,7 @@ struct cam {
     int idx;
     char url[512];
     int latency_ms;           /* SRT latency of this input, -1: [general] value */
+    SRTSOCKET srt_sock;       /* libsrt socket of the open input (g.lock), or invalid */
     /* protégé par g.lock */
     char label[LABEL_MAX];
     tally_t tally;
@@ -290,6 +293,7 @@ static void config_defaults(void)
         snprintf(cm->label, sizeof cm->label, "CAM %d", i + 1);
         cm->tally = TALLY_OFF;
         cm->latency_ms = -1;
+        cm->srt_sock = SRT_INVALID_SOCK;
     }
 }
 
@@ -494,6 +498,60 @@ static void cam_wait(struct cam *c, int ms)
         usleep(20000);
 }
 
+/*
+ * Receiver-side SRT statistics (ADR 0013). FFmpeg does not give the libsrt
+ * socket of an input, so ptzview defines srt_connect() (caller mode) and
+ * srt_accept() (listener mode): they call the real libsrt functions and note
+ * the socket in the input being opened. FFmpeg opens an input in the thread
+ * that calls avformat_open_input(), so a per-thread variable tells which
+ * input it is. Same -rdynamic mechanism as srt_cleanup() above.
+ */
+static __thread struct cam *opening_cam;
+
+static void note_srt_sock(SRTSOCKET s)
+{
+    struct cam *c = opening_cam;
+    if (!c || s == SRT_INVALID_SOCK)
+        return;
+    pthread_mutex_lock(&g.lock);
+    c->srt_sock = s;
+    pthread_mutex_unlock(&g.lock);
+}
+
+static void forget_srt_sock(struct cam *c)
+{
+    pthread_mutex_lock(&g.lock);
+    c->srt_sock = SRT_INVALID_SOCK;
+    pthread_mutex_unlock(&g.lock);
+}
+
+int srt_connect(SRTSOCKET u, const struct sockaddr *name, int namelen)
+{
+    typedef int (*connect_fn)(SRTSOCKET, const struct sockaddr *, int);
+    static connect_fn real;
+    if (!real)
+        real = (connect_fn)dlsym(RTLD_NEXT, "srt_connect");
+    if (!real)
+        return SRT_ERROR;
+    int r = real(u, name, namelen);
+    if (r != SRT_ERROR)
+        note_srt_sock(u);
+    return r;
+}
+
+SRTSOCKET srt_accept(SRTSOCKET u, struct sockaddr *addr, int *addrlen)
+{
+    typedef SRTSOCKET (*accept_fn)(SRTSOCKET, struct sockaddr *, int *);
+    static accept_fn real;
+    if (!real)
+        real = (accept_fn)dlsym(RTLD_NEXT, "srt_accept");
+    if (!real)
+        return SRT_INVALID_SOCK;
+    SRTSOCKET s = real(u, addr, addrlen);
+    note_srt_sock(s);
+    return s;
+}
+
 static void *cam_thread(void *arg)
 {
     struct cam *c = arg;
@@ -547,9 +605,12 @@ static void *cam_thread(void *arg)
         av_dict_set(&opt, "transtype", "live", 0);
 
         c->deadline_us = now_us() + (int64_t)(g.cfg.connect_timeout_ms + 2000) * 1000;
+        opening_cam = c;
         r = avformat_open_input(&fmt, url, ts, &opt);
+        opening_cam = NULL;
         av_dict_free(&opt);
         if (r < 0) {
+            forget_srt_sock(c);
             if (!c->reload)
                 cam_error(c, "connexion", r);
             continue;
@@ -647,6 +708,7 @@ static void *cam_thread(void *arg)
             }
         }
         avcodec_free_context(&dec);
+        forget_srt_sock(c);
         avformat_close_input(&fmt);
         if (c->reload)
             logm("cam%d : nouveaux réglages, reconnexion", c->idx + 1);
@@ -1442,6 +1504,25 @@ static void *display_thread(void *arg)
 /* API HTTP                                                            */
 /* ------------------------------------------------------------------ */
 
+/* Receiver-side SRT figures of one input; counters are cumulative since the
+ * connection started. A closed socket only makes srt_bistats() fail (libsrt
+ * does not reuse socket ids). */
+static void srt_json(struct sbuf *s, SRTSOCKET sock)
+{
+    SRT_TRACEBSTATS p;
+    if (sock == SRT_INVALID_SOCK || srt_bistats(sock, &p, 0, 1) == SRT_ERROR) {
+        sb_printf(s, "null");
+        return;
+    }
+    sb_printf(s,
+              "{\"rtt_ms\":%.1f,\"recv_mbps\":%.2f,\"bandwidth_mbps\":%.1f,"
+              "\"latency_ms\":%d,\"buffer_ms\":%d,\"packets\":%lld,\"lost\":%d,"
+              "\"retrans\":%d,\"dropped\":%d,\"belated\":%lld}",
+              p.msRTT, p.mbpsRecvRate, p.mbpsBandwidth, p.msRcvTsbPdDelay, p.msRcvBuf,
+              (long long)p.pktRecvTotal, p.pktRcvLossTotal, p.pktRcvRetrans, p.pktRcvDropTotal,
+              (long long)p.pktRcvBelated);
+}
+
 static char *status_json(void)
 {
     struct sbuf s = { 0 };
@@ -1469,6 +1550,8 @@ static char *status_json(void)
                   sig ? "true" : "false", sig ? c->fps : 0.0, sig ? c->mbps : 0.0, c->width,
                   c->height, c->connects, c->decode_errors);
         sb_json_str(&s, c->last_error);
+        sb_printf(&s, ",\"srt\":");
+        srt_json(&s, c->srt_sock);
         sb_printf(&s, "}");
     }
     pthread_mutex_unlock(&g.lock);

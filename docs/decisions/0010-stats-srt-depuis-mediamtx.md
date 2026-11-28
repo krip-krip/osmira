@@ -32,7 +32,8 @@ première, côté émetteur pour la seconde. Les postes passent par un relais
 - **Retrouver le poste par son adresse IP** : faux derrière le relais/NAT.
 - **Statistiques SRT lues sur le Pi** : FFmpeg n'expose pas les statistiques
   libsrt à `ptzview` sans modifier le C ; le Pi remonte déjà les symptômes
-  (i/s, erreurs de décodage, reconnexions) dans son état.
+  (i/s, erreurs de décodage, reconnexions) dans son état. *Revu le 28/11 :
+  ajouté en complément, voir ADR 0013.*
 - **Prometheus / InfluxDB** : composants de plus à installer ; SQLite suffit
   pour quelques dizaines de liaisons à 5 s (≈ 140 000 lignes par jour pour 8
   liaisons).

@@ -6,8 +6,8 @@
 - [x] Choix d'architecture (voir `decisions/`).
 
 ## Étape 1 — Mise en place du dépôt
-- [ ] Dépôt `osmira` sur GitHub, `ptzview` dans `osmiracam/player/`.
-- [ ] Documentation de départ (ce dossier) + `CLAUDE.md`.
+- [x] Dépôt `osmira` sur GitHub, `ptzview` dans `osmiracam/player/`.
+- [x] Documentation de départ (ce dossier) + `CLAUDE.md`.
 - [x] Protection de `main` (PR obligatoire, job `build` requis).
 - [x] CI minimale (compilation de `ptzview`).
 
@@ -43,7 +43,10 @@ affichée depuis le Core. Pas de pilotage PTZ à cette étape.
 - [x] Mesures système de chaque poste (CPU, température, alimentation, RAM,
   CMA, réseau, processus) et page par station avec courbes.
 - [ ] Sessions de mesure (protégées de la purge) et export CSV.
-- [ ] `ptzview` : publier les stats SRT côté réception (liaisons directes).
+- [x] `ptzview` : publier les stats SRT côté réception (ADR 0013), remontées
+  par l'agent.
+- [ ] Core : stocker et afficher les stats SRT côté réception (pages Links,
+  station).
 - [x] `ptzview` : changement d'une entrée à chaud (`/input/N`), entrées
   désactivées ; l'agent ne touche que les entrées modifiées.
 - [ ] `ptzview` : nombre de caméras configurable.

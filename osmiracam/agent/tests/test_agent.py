@@ -111,6 +111,7 @@ def ptz_cam(n: int, fps: float) -> dict:
         "connects": 1,
         "decode_errors": 3,
         "last_error": "",
+        "srt": {"rtt_ms": 1.2, "packets": 1000, "lost": 4, "retrans": 4, "dropped": 0},
     }
 
 
@@ -463,6 +464,7 @@ async def test_status_maps_ptzview_inputs_to_cameras(settings):
     cams = status["player"]["cameras"]
     assert [c["camera_id"] for c in cams] == ["cam1", "cam2"]  # free inputs left out
     assert cams[0]["fps"] == 49.9 and cams[0]["width"] == 1920 and cams[0]["decode_errors"] == 3
+    assert cams[0]["srt"]["lost"] == 4  # receiver-side SRT figures passed through
     assert status["system"]["cma_free_mb"] == 71
     assert status["system"]["temp_c"] == 51.6
 

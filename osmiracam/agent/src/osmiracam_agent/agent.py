@@ -257,6 +257,7 @@ class Agent:
                                 "connects",
                                 "decode_errors",
                                 "last_error",
+                                "srt",
                             )
                         },
                     }

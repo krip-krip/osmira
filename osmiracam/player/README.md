@@ -10,7 +10,7 @@ tally + UMD + NO SIGNAL sur un plan matériel séparé, et se pilote par HTTP.
 sudo apt update
 sudo apt install build-essential pkg-config \
   libavformat-dev libavcodec-dev libavutil-dev \
-  libdrm-dev libcairo2-dev libmicrohttpd-dev fonts-dejavu-core curl
+  libdrm-dev libcairo2-dev libmicrohttpd-dev libsrt-gnutls-dev fonts-dejavu-core curl
 apt policy libavcodec-dev        # la version installée doit contenir "+rpt"
 ```
 
@@ -86,6 +86,23 @@ Une entrée sans URL (`url =` vide dans la configuration) est désactivée :
 waiting / disabled), `signal`, `fps`, `mbps`, `connects` (nombre de connexions réussies),
 `decode_errors`, `last_error` ; plus `last_switch_ms` et un bloc `system`
 (RAM, swap, CMA libre, température).
+
+Chaque caméra a aussi un bloc `srt` : les statistiques SRT vues par le Pi
+(récepteur), lues dans libsrt (ADR 0013), ou `null` si l'entrée n'est pas
+connectée. Les compteurs sont cumulés depuis la connexion.
+
+| Champ | Sens |
+|---|---|
+| `rtt_ms` | aller-retour avec l'émetteur (MediaMTX ou caméra) |
+| `recv_mbps` | débit reçu |
+| `bandwidth_mbps` | capacité estimée de la liaison |
+| `latency_ms` | latence SRT réellement négociée avec l'émetteur |
+| `buffer_ms` | durée en attente dans le tampon de réception |
+| `packets` | paquets reçus |
+| `lost` | paquets perdus détectés (demandés à nouveau) |
+| `retrans` | paquets retransmis reçus |
+| `dropped` | paquets jamais arrivés à temps : **image abîmée** |
+| `belated` | paquets arrivés trop tard, ignorés |
 
 Les textes et tallies modifiés par l'API ne sont pas réécrits dans le fichier de
 configuration (retour aux valeurs du fichier au prochain lancement).
