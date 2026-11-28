@@ -4,6 +4,7 @@ osmiracam/player/ptzview.conf
 osmiracam/agent/agent.toml
 osmiracam/agent/state/
 *.o
+*.d
 
 # Python
 __pycache__/
