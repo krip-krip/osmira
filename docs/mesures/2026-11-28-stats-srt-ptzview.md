@@ -21,3 +21,33 @@ entrées ont été changées à chaud par `/input/N`.
 À faire avec les vraies caméras : comparer les pertes vues par MediaMTX
 (émetteur) et par le Pi (récepteur, `lost`/`dropped`) sur la liaison via
 `.252`.
+
+## Essai par MediaMTX avec 4 mires (même jour, plus tard)
+
+4 mires `mire-srt.ps1` sur le PC MediaMTX (testsrc2 1080p, HEVC `hevc_qsv`,
+12 Mb/s) publiées sur `test1`–`test4`. Les 4 entrées de ptzview les lisent par
+le relais `.252` (`/input/N`, Core arrêté). Mesure sur 60 s, écarts des
+compteurs `srt` de `/status` :
+
+| Entrée | Latence SRT | Perdus (récepteur) | Retransmis | **Jetés** | En retard |
+|---|---|---|---|---|---|
+| 1 | 20 ms | 5218 (7,6 %) | 5972 | **173** | 1495 |
+| 2 | 20 ms | 4620 (6,8 %) | 5398 | **198** | 1531 |
+| 3 | 40 ms | 5255 (7,7 %) | 6048 | **144** | 1319 |
+| 4 | 80 ms | 5570 (8,1 %) | 6051 | **20** | 1204 |
+
+RTT 4,8–5,2 ms, 12,2 Mb/s reçus par entrée, ~69 000 paquets par entrée.
+
+- Le Pi voit les mêmes 7–8 % de pertes que MediaMTX le 27/11 : elles sont
+  réelles sur la liaison MediaMTX → Pi (via `.252`), pas un artefact de
+  l'émetteur.
+- À 20 ms, ~3 paquets jetés par seconde et par flux : image abîmée.
+  40 ms n'aide presque pas (144). Il faut 80 ms pour descendre à 20 jetés par
+  minute. Les pertes arrivent donc par rafales plus longues que quelques RTT.
+- `decode_errors` reste à 0 malgré les paquets jetés : le décodeur ne signale
+  rien. Seul `srt.dropped` montre les dégâts.
+- ~43 i/s reçus au lieu de 50 sur les 4 entrées, à vérifier côté mires
+  (`speed=` de ffmpeg sur le PC Windows).
+
+Conclusion provisoire : avant de choisir la latence, trouver l'origine des
+pertes sur le chemin `.252` (la question ouverte « pertes toutes les 12 s »).
